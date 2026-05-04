@@ -42,3 +42,13 @@ integration_test/      # Integration scenarios when needed
 - Use WorkManager for background sending only through a dedicated bridge/service layer.
 - Cover payload serialization, queue behavior, and bridge error handling with tests.
 - Do not add Connect IQ watch app logic to this repository.
+
+## Verification
+
+Run these checks before handing off changes:
+
+```sh
+dart format .
+flutter analyze
+flutter test
+```
