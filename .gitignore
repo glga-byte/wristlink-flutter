@@ -107,6 +107,10 @@ unlinked_spec.ds
 # Coverage
 coverage/
 
+# IDE local files
+.idea/
+*.iml
+
 # Symbols
 app.*.symbols
 
