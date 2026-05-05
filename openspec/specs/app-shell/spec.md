@@ -29,6 +29,13 @@ The system SHALL provide a primary tab scaffold with Send, Queue, Devices, and S
 - **WHEN** the user selects a primary navigation destination
 - **THEN** the system displays the selected destination without requiring Garmin connectivity or native bridge setup
 
+### Requirement: Primary Navigation Iconography
+The system SHALL use toolbar icons for the Send, Queue, Devices, and Settings destinations that match the referenced paper primary-tab designs.
+
+#### Scenario: Primary navigation icons render
+- **WHEN** the app shell is displayed
+- **THEN** the primary navigation shows distinct icons for Send, Queue, Devices, and Settings matching the paper design intent
+
 ### Requirement: Queue Destination Placeholder
 The system SHALL provide a Queue destination that presents static queue progress and command status examples.
 
@@ -43,13 +50,6 @@ The system SHALL provide a Devices destination that presents static Garmin devic
 - **WHEN** the user opens the Devices destination
 - **THEN** the system shows example Garmin devices with connection, setup, and offline readiness states
 
-### Requirement: Settings Destination Placeholder
-The system SHALL provide a Settings destination placeholder in the primary tab scaffold.
-
-#### Scenario: Settings destination renders
-- **WHEN** the user opens the Settings destination
-- **THEN** the system shows a placeholder settings surface without requiring any persisted preferences
-
 ### Requirement: Basic Home Screen
 The system SHALL provide a Send destination as the initial user-facing app surface that identifies the primary "send to watch" workflow.
 
@@ -63,6 +63,24 @@ The system SHALL show placeholders for the expected WristLink workflows without 
 #### Scenario: Workflow placeholders are visible
 - **WHEN** the initial Send destination is displayed
 - **THEN** the user can see placeholders for sharing a place from Maps, manual points, timers, notes, and commands
+
+### Requirement: Send Quick Action Iconography
+The system SHALL show meaningful icons for Send home quick actions matching the referenced paper Send home design.
+
+#### Scenario: Send home quick action icons render
+- **WHEN** the initial Send destination is displayed
+- **THEN** the share-from-Maps, manual point, timer, note, and command actions each show an icon consistent with their action type
+
+### Requirement: Settings Destination Placeholder
+The system SHALL provide a Settings destination placeholder in the primary tab scaffold with visible rows for default watch, background sending, Developer Tools, and app information.
+
+#### Scenario: Settings destination renders
+- **WHEN** the user opens the Settings destination
+- **THEN** the system shows settings rows for `Default watch`, `Background sending`, `Developer Tools`, and `About WristLink` without requiring any persisted preferences
+
+#### Scenario: Developer Tools setting is placeholder only
+- **WHEN** the user opens the Settings destination
+- **THEN** the system shows `Developer Tools` with supporting text `Emulator device and bridge states` without showing Developer Tools behavior, emulator controls, or bridge state details
 
 ### Requirement: Baseline Widget Test Coverage
 The system SHALL include baseline widget tests for the app shell, primary navigation, and placeholder destination content.
