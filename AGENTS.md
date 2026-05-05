@@ -38,6 +38,7 @@ integration_test/      # Integration scenarios when needed
 - The send queue must survive app restarts and missing watch connectivity.
 - Every command must have an explicit status: pending, sending, sent, failed.
 - Map Garmin SDK and native bridge errors to clear domain errors.
+- UI should follow each platform's native design guidelines: Material Design on Android and iOS-native patterns, controls, navigation, and motion on iOS.
 - Do not mix UI models, storage models, and channel payloads without explicit mapping logic.
 - Use WorkManager for background sending only through a dedicated bridge/service layer.
 - Cover payload serialization, queue behavior, and bridge error handling with tests.
