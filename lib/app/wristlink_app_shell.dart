@@ -31,19 +31,23 @@ class _WristLinkAppShellState extends State<WristLinkAppShell> {
           });
         },
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.circle), label: 'Send'),
           NavigationDestination(
-            icon: Icon(Icons.radio_button_unchecked),
-            selectedIcon: Icon(Icons.radio_button_checked),
+            icon: Icon(Icons.send_outlined),
+            selectedIcon: Icon(Icons.send_rounded),
+            label: 'Send',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.format_list_bulleted_rounded),
             label: 'Queue',
           ),
           NavigationDestination(
-            icon: Icon(Icons.stop_rounded),
+            icon: Icon(Icons.watch_outlined),
+            selectedIcon: Icon(Icons.watch),
             label: 'Devices',
           ),
           NavigationDestination(
-            icon: Icon(Icons.radio_button_unchecked),
-            selectedIcon: Icon(Icons.radio_button_checked),
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
             label: 'Settings',
           ),
         ],
@@ -223,7 +227,14 @@ class SettingsScreen extends StatelessWidget {
           const _SettingsRow(
             icon: Icons.sync_outlined,
             title: 'Background sending',
-            detail: 'Not configured',
+            detail: 'Retry when watch reconnects',
+          ),
+          const _SettingsRow(
+            icon: Icons.code_rounded,
+            title: 'Developer Tools',
+            detail: 'Emulator device and bridge states',
+            iconColor: Color(0xFFFFCF33),
+            iconBackgroundColor: Color(0xFF111111),
           ),
           const _SettingsRow(
             icon: Icons.info_outline,
@@ -533,11 +544,15 @@ class _SettingsRow extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.detail,
+    this.iconColor = const Color(0xFF2F7D80),
+    this.iconBackgroundColor = const Color(0xFFF7F7F4),
   });
 
   final IconData icon;
   final String title;
   final String detail;
+  final Color iconColor;
+  final Color iconBackgroundColor;
 
   @override
   Widget build(BuildContext context) {
@@ -549,8 +564,17 @@ class _SettingsRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 18),
           child: Row(
             children: [
-              Icon(icon, color: const Color(0xFF2F7D80)),
-              const SizedBox(width: 16),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: iconBackgroundColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: SizedBox.square(
+                  dimension: 44,
+                  child: Icon(icon, color: iconColor),
+                ),
+              ),
+              const SizedBox(width: 18),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

@@ -9,6 +9,7 @@ These PNGs are design snapshots for implementation reference. They are not runti
 - `00-navigation-map.png` - product navigation, screen ownership, and the Send Point feature path.
 - `primary-tabs/` - persistent bottom-tab screens.
 - `send-point/` - first feature flow for manually or externally shared map points.
+- `settings/` - settings detail screens for device defaults, background sending, developer tools, and product information.
 
 ## Update Rules
 
