@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wristlink_flutter/app/wristlink_app.dart';
 
@@ -13,13 +14,22 @@ void main() {
     expect(find.text('Settings'), findsOneWidget);
     expect(find.text('Send to watch'), findsOneWidget);
     expect(find.text('Share a place from Maps'), findsOneWidget);
+    expect(find.byIcon(Icons.send_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.format_list_bulleted_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.watch_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.location_on_outlined), findsOneWidget);
     expect(find.text('Manual point'), findsOneWidget);
+    expect(find.byIcon(Icons.add_location_alt_outlined), findsOneWidget);
     expect(find.text('Timer'), findsOneWidget);
+    expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
     expect(find.text('Note'), findsOneWidget);
+    expect(find.byIcon(Icons.description_outlined), findsOneWidget);
 
     await tester.scrollUntilVisible(find.text('Command'), 120);
 
     expect(find.text('Command'), findsOneWidget);
+    expect(find.byIcon(Icons.code_rounded), findsOneWidget);
   });
 
   testWidgets('switches between primary tab destinations', (tester) async {
@@ -58,6 +68,9 @@ void main() {
     expect(find.text('WRISTLINK'), findsOneWidget);
     expect(find.text('Default watch'), findsOneWidget);
     expect(find.text('Background sending'), findsOneWidget);
+    expect(find.text('Retry when watch reconnects'), findsOneWidget);
+    expect(find.text('Developer Tools'), findsOneWidget);
+    expect(find.text('Emulator device and bridge states'), findsOneWidget);
     expect(find.text('About WristLink'), findsOneWidget);
   });
 }

@@ -5,21 +5,25 @@ class SendScreen extends StatelessWidget {
 
   static const _sendActions = <_SendActionData>[
     _SendActionData(
+      icon: Icons.add_location_alt_outlined,
       title: 'Manual point',
       description: 'Coordinates, label, optional note',
       color: Color(0xFF2F7D80),
     ),
     _SendActionData(
+      icon: Icons.timer_outlined,
       title: 'Timer',
       description: 'Countdown or reminder on the watch',
       color: Color(0xFFFFCF33),
     ),
     _SendActionData(
+      icon: Icons.description_outlined,
       title: 'Note',
       description: 'Short text saved on the watch',
       color: Color(0xFF111111),
     ),
     _SendActionData(
+      icon: Icons.code_rounded,
       title: 'Command',
       description: 'Reusable watch action or preset',
       color: Color(0xFF2F7D80),
@@ -108,7 +112,14 @@ class _SharePlaceCard extends StatelessWidget {
                   color: Color(0xFF111111),
                   shape: BoxShape.circle,
                 ),
-                child: SizedBox.square(dimension: 34),
+                child: SizedBox.square(
+                  dimension: 34,
+                  child: Icon(
+                    Icons.location_on_outlined,
+                    color: Color(0xFFFFCF33),
+                    size: 18,
+                  ),
+                ),
               ),
             ),
           ],
@@ -141,7 +152,17 @@ class _SendActionRow extends StatelessWidget {
                       ? Border.all(color: data.color, width: 3)
                       : null,
                 ),
-                child: const SizedBox.square(dimension: 36),
+                child: SizedBox.square(
+                  dimension: 36,
+                  child: Icon(
+                    data.icon,
+                    color:
+                        data.outlined || data.color == const Color(0xFFFFCF33)
+                        ? const Color(0xFF111111)
+                        : Colors.white,
+                    size: 20,
+                  ),
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -174,12 +195,14 @@ class _SendActionRow extends StatelessWidget {
 
 class _SendActionData {
   const _SendActionData({
+    required this.icon,
     required this.title,
     required this.description,
     required this.color,
     this.outlined = false,
   });
 
+  final IconData icon;
   final String title;
   final String description;
   final Color color;
