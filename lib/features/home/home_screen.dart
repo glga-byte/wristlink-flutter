@@ -1,28 +1,29 @@
 import 'package:flutter/material.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class SendScreen extends StatelessWidget {
+  const SendScreen({super.key});
 
-  static const _workflows = <_WorkflowPlaceholderData>[
-    _WorkflowPlaceholderData(
-      title: 'Points',
-      description: 'Save locations to send to your Garmin watch.',
-      icon: Icons.place_outlined,
+  static const _sendActions = <_SendActionData>[
+    _SendActionData(
+      title: 'Manual point',
+      description: 'Coordinates, label, optional note',
+      color: Color(0xFF2F7D80),
     ),
-    _WorkflowPlaceholderData(
-      title: 'Timers',
-      description: 'Prepare quick timers for watch-side use.',
-      icon: Icons.timer_outlined,
+    _SendActionData(
+      title: 'Timer',
+      description: 'Countdown or reminder on the watch',
+      color: Color(0xFFFFCF33),
     ),
-    _WorkflowPlaceholderData(
-      title: 'Notes',
-      description: 'Keep short notes ready for your wrist.',
-      icon: Icons.note_alt_outlined,
+    _SendActionData(
+      title: 'Note',
+      description: 'Short text saved on the watch',
+      color: Color(0xFF111111),
     ),
-    _WorkflowPlaceholderData(
-      title: 'Send queue',
-      description: 'Track pending, sending, sent, and failed commands.',
-      icon: Icons.sync_outlined,
+    _SendActionData(
+      title: 'Command',
+      description: 'Reusable watch action or preset',
+      color: Color(0xFF2F7D80),
+      outlined: true,
     ),
   ];
 
@@ -30,77 +31,84 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('WristLink')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Text(
-              'WristLink',
-              style: textTheme.headlineLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+        children: [
+          Text(
+            'READY ON FORERUNNER 965',
+            style: textTheme.labelMedium?.copyWith(
+              color: const Color(0xFF2F7D80),
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Send useful data from your phone to Garmin watches.',
-              style: textTheme.bodyLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Send to watch',
+            style: textTheme.displaySmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF111111),
             ),
-            const SizedBox(height: 24),
-            Text(
-              'Ready for core workflows',
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            for (final workflow in _workflows) ...[
-              _WorkflowPlaceholder(data: workflow),
-              const SizedBox(height: 12),
-            ],
-          ],
-        ),
+          ),
+          const SizedBox(height: 24),
+          const _SharePlaceCard(),
+          const SizedBox(height: 24),
+          const Divider(height: 1),
+          for (final action in _sendActions) _SendActionRow(data: action),
+        ],
       ),
     );
   }
 }
 
-class _WorkflowPlaceholder extends StatelessWidget {
-  const _WorkflowPlaceholder({required this.data});
-
-  final _WorkflowPlaceholderData data;
+class _SharePlaceCard extends StatelessWidget {
+  const _SharePlaceCard();
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border.all(color: colorScheme.outlineVariant),
+        color: const Color(0xFFFFCF33),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(data.icon, color: colorScheme.primary),
-            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    data.title,
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+                    'Share a place from Maps',
+                    style: textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF111111),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(data.description),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Open Google Maps, share a URL or text, then confirm the parsed point before sending.',
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: const Color(0xFF111111),
+                    ),
+                  ),
                 ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            const Padding(
+              padding: EdgeInsets.only(top: 2),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Color(0xFF111111),
+                  shape: BoxShape.circle,
+                ),
+                child: SizedBox.square(dimension: 34),
               ),
             ),
           ],
@@ -110,14 +118,70 @@ class _WorkflowPlaceholder extends StatelessWidget {
   }
 }
 
-class _WorkflowPlaceholderData {
-  const _WorkflowPlaceholderData({
+class _SendActionRow extends StatelessWidget {
+  const _SendActionRow({required this.data});
+
+  final _SendActionData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Row(
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: data.outlined ? Colors.transparent : data.color,
+                  borderRadius: BorderRadius.circular(data.outlined ? 18 : 8),
+                  border: data.outlined
+                      ? Border.all(color: data.color, width: 3)
+                      : null,
+                ),
+                child: const SizedBox.square(dimension: 36),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data.title,
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      data.description,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF6F6F69),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+      ],
+    );
+  }
+}
+
+class _SendActionData {
+  const _SendActionData({
     required this.title,
     required this.description,
-    required this.icon,
+    required this.color,
+    this.outlined = false,
   });
 
   final String title;
   final String description;
-  final IconData icon;
+  final Color color;
+  final bool outlined;
 }

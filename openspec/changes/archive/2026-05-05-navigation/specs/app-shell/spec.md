@@ -1,22 +1,4 @@
-## Purpose
-
-Define the baseline Flutter app shell, primary navigation, and initial Send surface for WristLink.
-
-## Requirements
-
-### Requirement: Runnable Flutter App
-The system SHALL provide a runnable Flutter application entry point that launches the WristLink app shell.
-
-#### Scenario: App starts
-- **WHEN** the Flutter application is launched
-- **THEN** the system displays the WristLink app shell without requiring Garmin connectivity or native bridge setup
-
-### Requirement: App Initialization Structure
-The system SHALL keep root app initialization in the app layer and keep the executable entry point minimal.
-
-#### Scenario: App shell is initialized
-- **WHEN** the executable entry point runs
-- **THEN** it delegates to a root app widget located under `lib/app/`
+## ADDED Requirements
 
 ### Requirement: Primary Tab Navigation
 The system SHALL provide a primary tab scaffold with Send, Queue, Devices, and Settings destinations.
@@ -49,6 +31,8 @@ The system SHALL provide a Settings destination placeholder in the primary tab s
 #### Scenario: Settings destination renders
 - **WHEN** the user opens the Settings destination
 - **THEN** the system shows a placeholder settings surface without requiring any persisted preferences
+
+## MODIFIED Requirements
 
 ### Requirement: Basic Home Screen
 The system SHALL provide a Send destination as the initial user-facing app surface that identifies the primary "send to watch" workflow.

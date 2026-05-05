@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../features/home/home_screen.dart';
+import 'wristlink_app_shell.dart';
 
 class WristLinkApp extends StatelessWidget {
   const WristLinkApp({super.key});
@@ -16,7 +16,7 @@ class WristLinkApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const HomeScreen(),
+      home: const WristLinkAppShell(),
     );
   }
 }
