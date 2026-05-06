@@ -23,6 +23,9 @@ void main() {
     expect(find.byIcon(Icons.add_location_alt_outlined), findsOneWidget);
     expect(find.text('Timer'), findsOneWidget);
     expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.text('Note'), 120);
+
     expect(find.text('Note'), findsOneWidget);
     expect(find.byIcon(Icons.description_outlined), findsOneWidget);
 

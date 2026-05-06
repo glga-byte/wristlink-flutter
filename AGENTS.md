@@ -42,6 +42,7 @@ integration_test/      # Integration scenarios when needed
 - Wrap Platform Channels in a typed Dart API; do not call channels directly from UI code.
 - Device-aware UI must use shared device models and services; do not keep separate screen-local device state for Devices, Default Watch, Share Confirm, or send readiness.
 - Model Garmin devices, emulator devices, default-watch selection, companion install state, and reachability in shared Dart domain types with explicit mapping from native SDK and storage payloads.
+- Device-aware Flutter screens must consume `DeviceDirectory` and presentation mappers under `lib/features/devices/`; keep emulator override behavior inside directory composition rather than branching in individual screens.
 - On iOS, Garmin device discovery uses Garmin Connect Mobile handoff/callback. Cache only the latest authorized device list and handle cancellation, missing Garmin Connect, timeouts, and app suspension as typed domain outcomes.
 - The send queue must survive app restarts and missing watch connectivity.
 - Every command must have an explicit status: pending, sending, sent, failed.

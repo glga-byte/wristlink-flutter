@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../features/developer_tools/presentation/developer_tools_screen.dart';
+import '../features/devices/data/in_memory_device_settings_store.dart';
+import '../features/devices/data/local_device_directory.dart';
+import '../features/devices/presentation/devices_screen.dart' as devices;
 import '../features/home/home_screen.dart';
 
 class WristLinkAppShell extends StatefulWidget {
@@ -11,18 +15,34 @@ class WristLinkAppShell extends StatefulWidget {
 
 class _WristLinkAppShellState extends State<WristLinkAppShell> {
   var _selectedIndex = 0;
+  late final LocalDeviceDirectory _deviceDirectory;
 
-  static const _destinations = <Widget>[
-    SendScreen(),
-    QueueScreen(),
-    DevicesScreen(),
-    SettingsScreen(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _deviceDirectory = LocalDeviceDirectory(
+      store: InMemoryDeviceSettingsStore(),
+    )..load();
+  }
+
+  @override
+  void dispose() {
+    _deviceDirectory.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: _destinations),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          SendScreen(deviceDirectory: _deviceDirectory),
+          const QueueScreen(),
+          devices.DevicesScreen(directory: _deviceDirectory),
+          SettingsScreen(deviceDirectory: _deviceDirectory),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
@@ -200,7 +220,9 @@ class DevicesScreen extends StatelessWidget {
 }
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({required this.deviceDirectory, super.key});
+
+  final LocalDeviceDirectory deviceDirectory;
 
   @override
   Widget build(BuildContext context) {
@@ -219,22 +241,38 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          const _SettingsRow(
+          _SettingsRow(
             icon: Icons.watch_outlined,
             title: 'Default watch',
             detail: 'Forerunner 965',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      devices.DefaultWatchScreen(directory: deviceDirectory),
+                ),
+              );
+            },
           ),
           const _SettingsRow(
             icon: Icons.sync_outlined,
             title: 'Background sending',
             detail: 'Retry when watch reconnects',
           ),
-          const _SettingsRow(
+          _SettingsRow(
             icon: Icons.code_rounded,
             title: 'Developer Tools',
             detail: 'Emulator device and bridge states',
             iconColor: Color(0xFFFFCF33),
             iconBackgroundColor: Color(0xFF111111),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      DeveloperToolsScreen(directory: deviceDirectory),
+                ),
+              );
+            },
           ),
           const _SettingsRow(
             icon: Icons.info_outline,
@@ -546,6 +584,7 @@ class _SettingsRow extends StatelessWidget {
     required this.detail,
     this.iconColor = const Color(0xFF2F7D80),
     this.iconBackgroundColor = const Color(0xFFF7F7F4),
+    this.onTap,
   });
 
   final IconData icon;
@@ -553,52 +592,57 @@ class _SettingsRow extends StatelessWidget {
   final String detail;
   final Color iconColor;
   final Color iconBackgroundColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          child: Row(
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: iconBackgroundColor,
-                  borderRadius: BorderRadius.circular(8),
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            child: Row(
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: iconBackgroundColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SizedBox.square(
+                    dimension: 44,
+                    child: Icon(icon, color: iconColor),
+                  ),
                 ),
-                child: SizedBox.square(
-                  dimension: 44,
-                  child: Icon(icon, color: iconColor),
-                ),
-              ),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                    Text(
-                      detail,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF6F6F69),
+                      Text(
+                        detail,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF6F6F69),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                if (onTap != null) const Icon(Icons.chevron_right),
+              ],
+            ),
           ),
-        ),
-        const Divider(height: 1),
-      ],
+          const Divider(height: 1),
+        ],
+      ),
     );
   }
 }
