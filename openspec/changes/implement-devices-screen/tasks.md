@@ -11,10 +11,10 @@
 
 - [x] 2.1 Define a typed Dart `GarminDeviceDiscoveryGateway` API and domain errors for SDK unavailable, Garmin Connect missing, authorization cancelled, no authorized devices, timeout, and unsupported platform.
 - [x] 2.2 Implement Platform Channel payload mapping between native discovery results and shared Dart device models.
-- [ ] 2.3 Implement the Android Garmin Connect IQ Mobile SDK adapter for device discovery, device status, companion app install status, and native error mapping.
-- [ ] 2.4 Configure Android dependencies and manifest entries needed for Garmin SDK discovery and status lookup.
-- [ ] 2.5 Implement the iOS Garmin Connect IQ Mobile SDK adapter for device authorization handoff, callback parsing, device status events, companion app install status, and native error mapping.
-- [ ] 2.6 Configure iOS SDK dependency, callback URL scheme or universal link handling, Info.plist entries, Bluetooth usage text, and linker/build settings required by the Garmin iOS SDK.
+- [x] 2.3 Implement the Android Garmin Connect IQ Mobile SDK adapter for device discovery, device status, companion app install status, and native error mapping.
+- [x] 2.4 Configure Android dependencies and manifest entries needed for Garmin SDK discovery and status lookup.
+- [x] 2.5 Implement the iOS Garmin Connect IQ Mobile SDK adapter for device authorization handoff, callback parsing, device status events, companion app install status, and native error mapping.
+- [x] 2.6 Configure iOS SDK dependency, callback URL scheme or universal link handling, Info.plist entries, Bluetooth usage text, and linker/build settings required by the Garmin iOS SDK.
 - [x] 2.7 Persist only the latest authorized normalized native device list and replace stale cached devices after each successful native authorization refresh.
 
 ## 3. Emulator Device
@@ -52,7 +52,7 @@
 - [x] 6.1 Run `dart format .`.
 - [x] 6.2 Run `flutter analyze`.
 - [x] 6.3 Run `flutter test`.
-- [ ] 6.4 Run `flutter build apk --debug` after Android native bridge work is included.
-- [ ] 6.5 Run `flutter build ios --no-codesign` after iOS native bridge work is included.
+- [x] 6.4 Run `flutter build apk --debug` after Android native bridge work is included.
+- [x] 6.5 Run `flutter build ios --no-codesign` after iOS native bridge work is included.
 - [x] 6.6 Update `AGENTS.md` with any additional durable project knowledge discovered during implementation.
 - [x] 6.7 Run `openspec validate implement-devices-screen --strict`.

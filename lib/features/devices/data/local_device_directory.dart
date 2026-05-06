@@ -5,7 +5,6 @@ import '../../garmin_bridge/garmin_device_discovery_gateway.dart';
 import '../domain/device_directory.dart';
 import '../domain/garmin_device.dart';
 import 'device_settings_store.dart';
-import 'in_memory_device_settings_store.dart';
 
 class LocalDeviceDirectory extends ChangeNotifier implements DeviceDirectory {
   LocalDeviceDirectory({
@@ -13,11 +12,7 @@ class LocalDeviceDirectory extends ChangeNotifier implements DeviceDirectory {
     GarminDeviceDiscoveryGateway discoveryGateway =
         const UnsupportedGarminDeviceDiscoveryGateway(),
   }) : _store = store,
-       _discoveryGateway = discoveryGateway {
-    _defaultDeviceId = sampleDefaultDeviceId;
-    _physicalDevices = samplePhysicalDevices;
-    _recompose();
-  }
+       _discoveryGateway = discoveryGateway;
 
   final DeviceSettingsStore _store;
   final GarminDeviceDiscoveryGateway _discoveryGateway;
