@@ -78,6 +78,33 @@ void main() {
     expect(find.textContaining('Emulator'), findsWidgets);
   });
 
+  testWidgets('Devices tab reacts when emulator becomes offline', (
+    tester,
+  ) async {
+    final directory = LocalDeviceDirectory(
+      store: InMemoryDeviceSettingsStore(
+        emulatorSettings: const EmulatorDeviceSettings(enabled: true),
+      ),
+    );
+    await directory.load();
+
+    await tester.pumpWidget(_App(child: DevicesScreen(directory: directory)));
+
+    expect(find.text('connected'), findsOneWidget);
+
+    await directory.updateEmulatorSettings(
+      const EmulatorDeviceSettings(
+        enabled: true,
+        reachability: DeviceReachability.offline,
+        companionInstallState: CompanionInstallState.installed,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('connected'), findsNothing);
+    expect(find.text('offline'), findsOneWidget);
+  });
+
   testWidgets('Default Watch screen updates shared default selection', (
     tester,
   ) async {
@@ -129,8 +156,8 @@ void main() {
   ) async {
     final directory = LocalDeviceDirectory(
       store: InMemoryDeviceSettingsStore(
-        defaultDeviceId: fixtureReadyDevice.id,
-        authorizedDevices: const [fixtureReadyDevice],
+        defaultDeviceId: const GarminDeviceId('emulator:wristlink-dev-watch'),
+        emulatorSettings: const EmulatorDeviceSettings(enabled: true),
       ),
     );
     await directory.load();
@@ -139,13 +166,29 @@ void main() {
       _App(child: SendScreen(deviceDirectory: directory)),
     );
 
-    expect(find.text('Forerunner 965 found'), findsOneWidget);
+    expect(find.text('WristLink Emulator found'), findsOneWidget);
     expect(find.text('Companion app installed'), findsOneWidget);
+
+    await directory.updateEmulatorSettings(
+      const EmulatorDeviceSettings(
+        enabled: true,
+        reachability: DeviceReachability.offline,
+        companionInstallState: CompanionInstallState.installed,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('WristLink Emulator found'), findsNothing);
+    expect(find.text('WristLink Emulator not ready'), findsOneWidget);
+    expect(find.text('Companion app not confirmed'), findsOneWidget);
   });
 }
 
 class _ErrorGateway implements GarminDeviceDiscoveryGateway {
   const _ErrorGateway();
+
+  @override
+  Stream<GarminDevice> get deviceUpdates => const Stream<GarminDevice>.empty();
 
   @override
   Future<List<GarminDevice>> discoverDevices() async {

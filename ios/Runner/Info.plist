@@ -43,6 +43,10 @@
 	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>WristLink uses Garmin Connect IQ to discover authorized watches for sending data.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>WristLink uses Garmin Connect IQ to discover authorized watches for sending data.</string>
+	<key>WristLinkConnectIQAppUUID</key>
+	<string>00000000-0000-0000-0000-000000000000</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

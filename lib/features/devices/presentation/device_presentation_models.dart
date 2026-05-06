@@ -44,6 +44,7 @@ class DeviceRowModel {
 DevicesPresentation mapDevicesPresentation({
   required List<GarminDevice> devices,
   GarminDiscoveryError? refreshError,
+  DeviceDirectoryEmptyReason? emptyReason,
 }) {
   final rows = devices.map(mapDeviceRow).toList(growable: false);
   final featuredCandidates = rows.where((row) {
@@ -54,8 +55,8 @@ DevicesPresentation mapDevicesPresentation({
   return DevicesPresentation(
     featuredDevice: featured,
     rows: rows.where((row) => row.id != featured?.id).toList(growable: false),
-    emptyTitle: 'No Garmin devices',
-    emptyMessage: 'Refresh to authorize Garmin Connect IQ devices.',
+    emptyTitle: _emptyTitle(emptyReason),
+    emptyMessage: _emptyMessage(emptyReason),
     errorMessage: refreshError == null
         ? null
         : _discoveryErrorMessage(refreshError),
@@ -69,7 +70,7 @@ DeviceRowModel mapDeviceRow(GarminDevice device) {
     detail: _detail(device),
     status: _status(device),
     statusColor: _statusColor(device),
-    accentColor: device.accentColor,
+    accentColor: _accentColor(device),
     isDefault: device.isDefault,
     source: device.source,
   );
@@ -121,6 +122,21 @@ Color _statusColor(GarminDevice device) {
   };
 }
 
+Color _accentColor(GarminDevice device) {
+  if (device.source == DeviceSource.emulator) {
+    return const Color(0xFFFFCF33);
+  }
+  if (device.isDefault && device.isReady) {
+    return const Color(0xFF111111);
+  }
+  return switch (device.readiness) {
+    DeviceReadiness.ready => const Color(0xFF2F7D80),
+    DeviceReadiness.needsSetup => const Color(0xFFD8444A),
+    DeviceReadiness.testing => const Color(0xFF111111),
+    DeviceReadiness.unavailable => const Color(0xFF6F6F69),
+  };
+}
+
 String _discoveryErrorMessage(GarminDiscoveryError error) {
   return switch (error.code) {
     GarminDiscoveryErrorCode.garminConnectMissing =>
@@ -137,6 +153,24 @@ String _discoveryErrorMessage(GarminDiscoveryError error) {
     GarminDiscoveryErrorCode.invalidPayload =>
       'Garmin discovery returned an invalid device payload.',
     GarminDiscoveryErrorCode.nativeFailure => error.message,
+  };
+}
+
+String _emptyTitle(DeviceDirectoryEmptyReason? reason) {
+  return switch (reason) {
+    DeviceDirectoryEmptyReason.unsupportedPlatform =>
+      'Garmin discovery unavailable',
+    DeviceDirectoryEmptyReason.noAuthorizedDevices ||
+    null => 'No Garmin devices',
+  };
+}
+
+String _emptyMessage(DeviceDirectoryEmptyReason? reason) {
+  return switch (reason) {
+    DeviceDirectoryEmptyReason.unsupportedPlatform =>
+      'Use a supported Android or iOS device to authorize Garmin Connect IQ devices.',
+    DeviceDirectoryEmptyReason.noAuthorizedDevices ||
+    null => 'Refresh to authorize Garmin Connect IQ devices.',
   };
 }
 

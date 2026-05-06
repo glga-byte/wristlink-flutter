@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../devices/data/local_device_directory.dart';
+import '../domain/device_directory.dart';
 import 'device_presentation_models.dart';
 
 class DevicesScreen extends StatefulWidget {
   const DevicesScreen({required this.directory, super.key});
 
-  final LocalDeviceDirectory directory;
+  final DeviceDirectoryController directory;
 
   @override
   State<DevicesScreen> createState() => _DevicesScreenState();
@@ -23,6 +23,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
         final presentation = mapDevicesPresentation(
           devices: widget.directory.devices,
           refreshError: widget.directory.lastRefreshError,
+          emptyReason: widget.directory.emptyReason,
         );
 
         return SafeArea(
@@ -89,11 +90,14 @@ class _DevicesScreenState extends State<DevicesScreen> {
     setState(() {
       _refreshing = true;
     });
-    await widget.directory.refreshDevices();
-    if (mounted) {
-      setState(() {
-        _refreshing = false;
-      });
+    try {
+      await widget.directory.refreshDevices();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _refreshing = false;
+        });
+      }
     }
   }
 }
@@ -101,7 +105,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
 class DefaultWatchScreen extends StatelessWidget {
   const DefaultWatchScreen({required this.directory, super.key});
 
-  final LocalDeviceDirectory directory;
+  final DeviceDirectoryController directory;
 
   @override
   Widget build(BuildContext context) {

@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import '../domain/garmin_device.dart';
 
 const fixtureReadyDevice = GarminDevice(
@@ -9,7 +7,6 @@ const fixtureReadyDevice = GarminDevice(
   reachability: DeviceReachability.reachable,
   companionInstallState: CompanionInstallState.installed,
   isDefault: true,
-  accentColor: Color(0xFF111111),
 );
 
 const fixtureSetupDevice = GarminDevice(

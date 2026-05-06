@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 enum DeviceSource { physical, emulator }
 
 enum DeviceReachability { reachable, nearby, offline, sending, failed, unknown }
@@ -8,7 +6,6 @@ enum CompanionInstallState { installed, missing, unknown }
 
 enum DeviceReadiness { ready, needsSetup, unavailable, testing }
 
-@immutable
 class GarminDeviceId {
   const GarminDeviceId(this.value);
 
@@ -26,7 +23,6 @@ class GarminDeviceId {
   int get hashCode => value.hashCode;
 }
 
-@immutable
 class GarminDeviceMetadata {
   const GarminDeviceMetadata({
     this.modelName,
@@ -59,7 +55,6 @@ class GarminDeviceMetadata {
   }
 }
 
-@immutable
 class GarminDevice {
   const GarminDevice({
     required this.id,
@@ -69,7 +64,6 @@ class GarminDevice {
     required this.companionInstallState,
     this.metadata = const GarminDeviceMetadata(),
     this.isDefault = false,
-    this.accentColor = const Color(0xFF2F7D80),
   });
 
   final GarminDeviceId id;
@@ -79,7 +73,6 @@ class GarminDevice {
   final CompanionInstallState companionInstallState;
   final GarminDeviceMetadata metadata;
   final bool isDefault;
-  final Color accentColor;
 
   DeviceReadiness get readiness {
     return deriveDeviceReadiness(
@@ -98,7 +91,6 @@ class GarminDevice {
     CompanionInstallState? companionInstallState,
     GarminDeviceMetadata? metadata,
     bool? isDefault,
-    Color? accentColor,
   }) {
     return GarminDevice(
       id: id ?? this.id,
@@ -109,7 +101,6 @@ class GarminDevice {
           companionInstallState ?? this.companionInstallState,
       metadata: metadata ?? this.metadata,
       isDefault: isDefault ?? this.isDefault,
-      accentColor: accentColor ?? this.accentColor,
     );
   }
 }

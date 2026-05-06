@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../features/developer_tools/domain/emulator_device_controller.dart';
 import '../features/developer_tools/presentation/developer_tools_screen.dart';
-import '../features/devices/data/in_memory_device_settings_store.dart';
 import '../features/devices/data/local_device_directory.dart';
+import '../features/devices/data/method_channel_device_settings_store.dart';
+import '../features/devices/domain/device_directory.dart';
 import '../features/devices/presentation/devices_screen.dart' as devices;
 import '../features/garmin_bridge/garmin_device_discovery_gateway.dart';
 import '../features/home/home_screen.dart';
@@ -22,7 +24,7 @@ class _WristLinkAppShellState extends State<WristLinkAppShell> {
   void initState() {
     super.initState();
     _deviceDirectory = LocalDeviceDirectory(
-      store: InMemoryDeviceSettingsStore(),
+      store: MethodChannelDeviceSettingsStore(),
       discoveryGateway: MethodChannelGarminDeviceDiscoveryGateway(),
     )..load();
   }
@@ -42,7 +44,10 @@ class _WristLinkAppShellState extends State<WristLinkAppShell> {
           SendScreen(deviceDirectory: _deviceDirectory),
           const QueueScreen(),
           devices.DevicesScreen(directory: _deviceDirectory),
-          SettingsScreen(deviceDirectory: _deviceDirectory),
+          SettingsScreen(
+            deviceDirectory: _deviceDirectory,
+            emulatorController: _deviceDirectory,
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -161,9 +166,14 @@ class QueueScreen extends StatelessWidget {
 }
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({required this.deviceDirectory, super.key});
+  const SettingsScreen({
+    required this.deviceDirectory,
+    required this.emulatorController,
+    super.key,
+  });
 
-  final LocalDeviceDirectory deviceDirectory;
+  final DeviceDirectoryController deviceDirectory;
+  final EmulatorDeviceController emulatorController;
 
   @override
   Widget build(BuildContext context) {
@@ -219,7 +229,7 @@ class SettingsScreen extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) =>
-                      DeveloperToolsScreen(directory: deviceDirectory),
+                      DeveloperToolsScreen(directory: emulatorController),
                 ),
               );
             },

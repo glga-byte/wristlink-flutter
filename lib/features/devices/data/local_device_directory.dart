@@ -1,27 +1,37 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
+import '../../developer_tools/domain/emulator_device_controller.dart';
 import '../../developer_tools/domain/emulator_device_settings.dart';
 import '../../garmin_bridge/garmin_device_discovery_gateway.dart';
 import '../domain/device_directory.dart';
 import '../domain/garmin_device.dart';
 import 'device_settings_store.dart';
 
-class LocalDeviceDirectory extends ChangeNotifier implements DeviceDirectory {
+class LocalDeviceDirectory extends ChangeNotifier
+    implements DeviceDirectoryController, EmulatorDeviceController {
   LocalDeviceDirectory({
     required DeviceSettingsStore store,
     GarminDeviceDiscoveryGateway discoveryGateway =
         const UnsupportedGarminDeviceDiscoveryGateway(),
   }) : _store = store,
-       _discoveryGateway = discoveryGateway;
+       _discoveryGateway = discoveryGateway {
+    _deviceUpdateSubscription = _discoveryGateway.deviceUpdates.listen(
+      _applyNativeDeviceUpdate,
+    );
+  }
 
   final DeviceSettingsStore _store;
   final GarminDeviceDiscoveryGateway _discoveryGateway;
+  late final StreamSubscription<GarminDevice> _deviceUpdateSubscription;
 
   GarminDeviceId? _defaultDeviceId;
   List<GarminDevice> _physicalDevices = const <GarminDevice>[];
   EmulatorDeviceSettings _emulatorSettings = const EmulatorDeviceSettings();
   List<GarminDevice> _devices = const <GarminDevice>[];
   GarminDiscoveryError? _lastRefreshError;
+  DeviceDirectoryEmptyReason? _emptyReason;
 
   @override
   List<GarminDevice> get devices => List<GarminDevice>.unmodifiable(_devices);
@@ -29,10 +39,14 @@ class LocalDeviceDirectory extends ChangeNotifier implements DeviceDirectory {
   @override
   GarminDeviceId? get defaultDeviceId => _defaultDeviceId;
 
+  @override
   EmulatorDeviceSettings get emulatorSettings => _emulatorSettings;
 
   @override
   GarminDiscoveryError? get lastRefreshError => _lastRefreshError;
+
+  @override
+  DeviceDirectoryEmptyReason? get emptyReason => _emptyReason;
 
   Future<void> load() async {
     _defaultDeviceId = await _store.readDefaultDeviceId();
@@ -54,13 +68,37 @@ class LocalDeviceDirectory extends ChangeNotifier implements DeviceDirectory {
       await _store.replaceAuthorizedDevices(discoveredDevices);
       _physicalDevices = discoveredDevices;
       _lastRefreshError = null;
+      _emptyReason = discoveredDevices.isEmpty
+          ? DeviceDirectoryEmptyReason.noAuthorizedDevices
+          : null;
       _recompose();
       notifyListeners();
       return DeviceRefreshSuccess(devices);
     } on GarminDiscoveryError catch (error) {
+      if (error.code == GarminDiscoveryErrorCode.timeout &&
+          _physicalDevices.isNotEmpty) {
+        _lastRefreshError = null;
+        _recompose();
+        notifyListeners();
+        return DeviceRefreshSuccess(devices);
+      }
       _lastRefreshError = error;
+      if (_devices.isEmpty) {
+        _emptyReason = _emptyReasonForError(error);
+      }
       notifyListeners();
       return DeviceRefreshFailure(error);
+    } on Object catch (error) {
+      final discoveryError = GarminDiscoveryError(
+        GarminDiscoveryErrorCode.nativeFailure,
+        'Garmin device discovery failed: $error',
+      );
+      _lastRefreshError = discoveryError;
+      if (_devices.isEmpty) {
+        _emptyReason = _emptyReasonForError(discoveryError);
+      }
+      notifyListeners();
+      return DeviceRefreshFailure(discoveryError);
     }
   }
 
@@ -72,6 +110,13 @@ class LocalDeviceDirectory extends ChangeNotifier implements DeviceDirectory {
     notifyListeners();
   }
 
+  @override
+  void dispose() {
+    _deviceUpdateSubscription.cancel();
+    super.dispose();
+  }
+
+  @override
   Future<void> updateEmulatorSettings(EmulatorDeviceSettings settings) async {
     _emulatorSettings = settings;
     await _store.writeEmulatorSettings(settings);
@@ -144,6 +189,29 @@ class LocalDeviceDirectory extends ChangeNotifier implements DeviceDirectory {
           return device.copyWith(isDefault: device.id == _defaultDeviceId);
         })
         .toList(growable: false);
+    _emptyReason = _devices.isEmpty
+        ? _emptyReason ?? _defaultEmptyReason()
+        : null;
+  }
+
+  Future<void> _applyNativeDeviceUpdate(GarminDevice device) async {
+    if (device.source != DeviceSource.physical) {
+      return;
+    }
+
+    final index = _physicalDevices.indexWhere((current) {
+      return current.id == device.id;
+    });
+    if (index == -1) {
+      return;
+    }
+
+    final updatedPhysicalDevices = List<GarminDevice>.of(_physicalDevices);
+    updatedPhysicalDevices[index] = device;
+    _physicalDevices = updatedPhysicalDevices;
+    await _store.replaceAuthorizedDevices(updatedPhysicalDevices);
+    _recompose();
+    notifyListeners();
   }
 
   GarminDevice get _emulatorDevice {
@@ -157,7 +225,20 @@ class LocalDeviceDirectory extends ChangeNotifier implements DeviceDirectory {
         modelName: 'Connect IQ Emulator',
         family: 'Developer Tools',
       ),
-      accentColor: const Color(0xFFFFCF33),
     );
+  }
+
+  DeviceDirectoryEmptyReason _defaultEmptyReason() {
+    return _lastRefreshError == null
+        ? DeviceDirectoryEmptyReason.noAuthorizedDevices
+        : _emptyReasonForError(_lastRefreshError!);
+  }
+
+  DeviceDirectoryEmptyReason _emptyReasonForError(GarminDiscoveryError error) {
+    return switch (error.code) {
+      GarminDiscoveryErrorCode.unsupportedPlatform =>
+        DeviceDirectoryEmptyReason.unsupportedPlatform,
+      _ => DeviceDirectoryEmptyReason.noAuthorizedDevices,
+    };
   }
 }

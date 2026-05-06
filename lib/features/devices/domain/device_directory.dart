@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'garmin_device.dart';
 
 enum DeviceDirectoryEmptyReason { noAuthorizedDevices, unsupportedPlatform }
@@ -72,9 +74,14 @@ abstract interface class DeviceDirectory {
 
   GarminDiscoveryError? get lastRefreshError;
 
+  DeviceDirectoryEmptyReason? get emptyReason;
+
   Future<DeviceRefreshResult> refreshDevices();
 
   Future<void> setDefaultDevice(GarminDeviceId id);
 
   SendTargetResolution resolveSendTarget();
 }
+
+abstract interface class DeviceDirectoryController
+    implements DeviceDirectory, Listenable {}

@@ -5,10 +5,31 @@ import 'package:wristlink_flutter/app/wristlink_app.dart';
 
 void main() {
   const garminDevicesChannel = MethodChannel('wristlink/garmin_devices');
+  const deviceSettingsChannel = MethodChannel('wristlink/device_settings');
+  final settings = <String, String>{};
+
+  setUp(() {
+    settings.clear();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(deviceSettingsChannel, (call) async {
+          final arguments = call.arguments as Map<Object?, Object?>?;
+          final key = arguments?['key'] as String?;
+          switch (call.method) {
+            case 'readString':
+              return settings[key];
+            case 'writeString':
+              settings[key!] = arguments?['value'] as String;
+              return null;
+          }
+          return null;
+        });
+  });
 
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(garminDevicesChannel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(deviceSettingsChannel, null);
   });
 
   testWidgets('renders the primary tab scaffold and initial Send destination', (
@@ -110,10 +131,40 @@ void main() {
     await tester.tap(find.text('Devices'));
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.refresh_rounded));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
     expect(calls, ['discoverDevices']);
     expect(find.text('Native Test Watch'), findsOneWidget);
     expect(find.text('connected'), findsOneWidget);
+  });
+
+  testWidgets('Developer Tools offline state appears on Devices tab', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const WristLinkApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Developer Tools'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Offline'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Emulator is enabled · offline · installed'),
+      findsOneWidget,
+    );
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Devices'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('WristLink Emulator'), findsOneWidget);
+    expect(find.text('offline'), findsOneWidget);
+    expect(find.text('connected'), findsNothing);
   });
 }

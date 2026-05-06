@@ -5,23 +5,52 @@ import '../devices/domain/garmin_device.dart';
 
 abstract interface class GarminDeviceDiscoveryGateway {
   Future<List<GarminDevice>> discoverDevices();
+
+  Stream<GarminDevice> get deviceUpdates;
 }
 
 class MethodChannelGarminDeviceDiscoveryGateway
     implements GarminDeviceDiscoveryGateway {
   MethodChannelGarminDeviceDiscoveryGateway({
     MethodChannel channel = const MethodChannel('wristlink/garmin_devices'),
-  }) : _channel = channel;
+    EventChannel eventChannel = const EventChannel(
+      'wristlink/garmin_device_events',
+    ),
+    Duration timeout = const Duration(seconds: 35),
+  }) : _channel = channel,
+       _eventChannel = eventChannel,
+       _timeout = timeout;
 
   final MethodChannel _channel;
+  final EventChannel _eventChannel;
+  final Duration _timeout;
+
+  @override
+  Stream<GarminDevice> get deviceUpdates {
+    return _eventChannel
+        .receiveBroadcastStream()
+        .where((event) => event is Map)
+        .cast<Map>()
+        .map((event) => mapNativeDevice(event.cast<Object?, Object?>()));
+  }
 
   @override
   Future<List<GarminDevice>> discoverDevices() async {
     try {
-      final payload = await _channel.invokeListMethod<Object?>(
-        'discoverDevices',
-      );
+      final payload = await _channel
+          .invokeListMethod<Object?>('discoverDevices')
+          .timeout(
+            _timeout,
+            onTimeout: () {
+              throw const GarminDiscoveryError(
+                GarminDiscoveryErrorCode.timeout,
+                'Garmin device discovery timed out.',
+              );
+            },
+          );
       return mapNativeDeviceList(payload ?? const <Object?>[]);
+    } on GarminDiscoveryError {
+      rethrow;
     } on PlatformException catch (error) {
       throw mapPlatformException(error);
     } on TypeError catch (error) {
@@ -38,6 +67,9 @@ class UnsupportedGarminDeviceDiscoveryGateway
   const UnsupportedGarminDeviceDiscoveryGateway();
 
   @override
+  Stream<GarminDevice> get deviceUpdates => const Stream<GarminDevice>.empty();
+
+  @override
   Future<List<GarminDevice>> discoverDevices() async {
     throw const GarminDiscoveryError(
       GarminDiscoveryErrorCode.unsupportedPlatform,
@@ -48,8 +80,8 @@ class UnsupportedGarminDeviceDiscoveryGateway
 
 List<GarminDevice> mapNativeDeviceList(List<Object?> payload) {
   return payload
-      .whereType<Map<Object?, Object?>>()
-      .map(mapNativeDevice)
+      .whereType<Map>()
+      .map((device) => mapNativeDevice(device.cast<Object?, Object?>()))
       .toList(growable: false);
 }
 
@@ -110,10 +142,14 @@ DateTime? _dateTime(Object? value) {
 }
 
 DeviceReachability _reachability(Object? value) {
-  return switch (value) {
+  final normalized = value is String ? value.toLowerCase() : '';
+  return switch (normalized) {
+    'not_connected' ||
+    'not_paired' ||
+    'offline' ||
+    'unavailable' => DeviceReachability.offline,
     'reachable' || 'connected' || 'available' => DeviceReachability.reachable,
     'nearby' => DeviceReachability.nearby,
-    'offline' || 'unavailable' => DeviceReachability.offline,
     'sending' => DeviceReachability.sending,
     'failed' => DeviceReachability.failed,
     _ => DeviceReachability.unknown,

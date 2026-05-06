@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wristlink_flutter/features/devices/domain/device_directory.dart';
 import 'package:wristlink_flutter/features/devices/domain/garmin_device.dart';
@@ -57,6 +58,33 @@ void main() {
     );
   });
 
+  test('maps Garmin disconnected enum strings before connected substring', () {
+    final devices = mapNativeDeviceList([
+      {
+        'id': 'off',
+        'name': 'Powered off watch',
+        'reachability': 'NOT_CONNECTED',
+        'companionInstallState': 'installed',
+      },
+      {
+        'id': 'paired',
+        'name': 'Unpaired watch',
+        'reachability': 'not_paired',
+        'companionInstallState': 'installed',
+      },
+      {
+        'id': 'on',
+        'name': 'Connected watch',
+        'reachability': 'CONNECTED',
+        'companionInstallState': 'installed',
+      },
+    ]);
+
+    expect(devices[0].reachability, DeviceReachability.offline);
+    expect(devices[1].reachability, DeviceReachability.offline);
+    expect(devices[2].reachability, DeviceReachability.reachable);
+  });
+
   test('maps discovery errors to user-presentable devices state', () {
     final presentation = mapDevicesPresentation(
       devices: const [],
@@ -68,6 +96,26 @@ void main() {
 
     expect(presentation.emptyTitle, 'No Garmin devices');
     expect(presentation.errorMessage, 'Garmin Connect is not installed.');
+  });
+
+  test('maps all known platform discovery error codes', () {
+    final expectedCodes = {
+      'sdkUnavailable': GarminDiscoveryErrorCode.sdkUnavailable,
+      'garminConnectMissing': GarminDiscoveryErrorCode.garminConnectMissing,
+      'authorizationCancelled': GarminDiscoveryErrorCode.authorizationCancelled,
+      'noAuthorizedDevices': GarminDiscoveryErrorCode.noAuthorizedDevices,
+      'timeout': GarminDiscoveryErrorCode.timeout,
+      'unsupportedPlatform': GarminDiscoveryErrorCode.unsupportedPlatform,
+      'other': GarminDiscoveryErrorCode.nativeFailure,
+    };
+
+    for (final entry in expectedCodes.entries) {
+      final error = mapPlatformException(
+        PlatformException(code: entry.key, message: 'failure'),
+      );
+      expect(error.code, entry.value);
+      expect(error.message, 'failure');
+    }
   });
 
   test('maps share readiness from send-target resolution', () {
@@ -85,5 +133,18 @@ void main() {
     expect(ready.foundWatchLabel, 'Forerunner 965 found');
     expect(missingCompanion.canSend, isFalse);
     expect(missingCompanion.companionInstalledLabel, 'Companion app missing');
+  });
+
+  test('derives presentation colors outside device domain models', () {
+    final readyRow = mapDeviceRow(fixtureReadyDevice);
+    final emulatorRow = mapDeviceRow(
+      fixtureReadyDevice.copyWith(
+        id: const GarminDeviceId('emulator:test'),
+        source: DeviceSource.emulator,
+      ),
+    );
+
+    expect(readyRow.accentColor, const Color(0xFF111111));
+    expect(emulatorRow.accentColor, const Color(0xFFFFCF33));
   });
 }

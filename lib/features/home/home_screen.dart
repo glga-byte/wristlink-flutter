@@ -6,7 +6,7 @@ import '../devices/presentation/device_presentation_models.dart';
 class SendScreen extends StatelessWidget {
   const SendScreen({required this.deviceDirectory, super.key});
 
-  final DeviceDirectory deviceDirectory;
+  final DeviceDirectoryController deviceDirectory;
 
   static const _sendActions = <_SendActionData>[
     _SendActionData(
@@ -38,40 +38,45 @@ class SendScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final readiness = mapShareConfirmReadiness(
-      deviceDirectory.resolveSendTarget(),
-    );
+    return AnimatedBuilder(
+      animation: deviceDirectory,
+      builder: (context, _) {
+        final textTheme = Theme.of(context).textTheme;
+        final readiness = mapShareConfirmReadiness(
+          deviceDirectory.resolveSendTarget(),
+        );
 
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-        children: [
-          Text(
-            readiness.canSend
-                ? 'READY ON ${readiness.foundWatchLabel.toUpperCase().replaceAll(' FOUND', '')}'
-                : 'WATCH SETUP NEEDED',
-            style: textTheme.labelMedium?.copyWith(
-              color: const Color(0xFF2F7D80),
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0,
-            ),
+        return SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+            children: [
+              Text(
+                readiness.canSend
+                    ? 'READY ON ${readiness.foundWatchLabel.toUpperCase().replaceAll(' FOUND', '')}'
+                    : 'WATCH SETUP NEEDED',
+                style: textTheme.labelMedium?.copyWith(
+                  color: const Color(0xFF2F7D80),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Send to watch',
+                style: textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF111111),
+                ),
+              ),
+              const SizedBox(height: 24),
+              _SharePlaceCard(readiness: readiness),
+              const SizedBox(height: 24),
+              const Divider(height: 1),
+              for (final action in _sendActions) _SendActionRow(data: action),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Send to watch',
-            style: textTheme.displaySmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF111111),
-            ),
-          ),
-          const SizedBox(height: 24),
-          _SharePlaceCard(readiness: readiness),
-          const SizedBox(height: 24),
-          const Divider(height: 1),
-          for (final action in _sendActions) _SendActionRow(data: action),
-        ],
-      ),
+        );
+      },
     );
   }
 }
