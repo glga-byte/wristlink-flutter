@@ -1,5 +1,3 @@
-enum DeviceSource { physical, emulator }
-
 enum DeviceReachability { reachable, nearby, offline, sending, failed, unknown }
 
 enum CompanionInstallState { installed, missing, unknown }
@@ -59,7 +57,6 @@ class GarminDevice {
   const GarminDevice({
     required this.id,
     required this.name,
-    required this.source,
     required this.reachability,
     required this.companionInstallState,
     this.metadata = const GarminDeviceMetadata(),
@@ -68,7 +65,6 @@ class GarminDevice {
 
   final GarminDeviceId id;
   final String name;
-  final DeviceSource source;
   final DeviceReachability reachability;
   final CompanionInstallState companionInstallState;
   final GarminDeviceMetadata metadata;
@@ -86,7 +82,6 @@ class GarminDevice {
   GarminDevice copyWith({
     GarminDeviceId? id,
     String? name,
-    DeviceSource? source,
     DeviceReachability? reachability,
     CompanionInstallState? companionInstallState,
     GarminDeviceMetadata? metadata,
@@ -95,7 +90,6 @@ class GarminDevice {
     return GarminDevice(
       id: id ?? this.id,
       name: name ?? this.name,
-      source: source ?? this.source,
       reachability: reachability ?? this.reachability,
       companionInstallState:
           companionInstallState ?? this.companionInstallState,

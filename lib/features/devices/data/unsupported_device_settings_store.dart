@@ -1,4 +1,3 @@
-import '../../developer_tools/domain/emulator_device_settings.dart';
 import '../domain/garmin_device.dart';
 import 'device_settings_store.dart';
 
@@ -25,15 +24,6 @@ class UnsupportedDeviceSettingsStore implements DeviceSettingsStore {
 
   @override
   Future<void> replaceAuthorizedDevices(List<GarminDevice> devices) async {
-    _throwUnsupported();
-  }
-
-  @override
-  Future<EmulatorDeviceSettings> readEmulatorSettings() async =>
-      _throwUnsupported();
-
-  @override
-  Future<void> writeEmulatorSettings(EmulatorDeviceSettings settings) async {
     _throwUnsupported();
   }
 }

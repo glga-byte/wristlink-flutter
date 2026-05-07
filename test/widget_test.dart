@@ -127,9 +127,7 @@ void main() {
     expect(find.text('connected'), findsOneWidget);
   });
 
-  testWidgets('Developer Tools offline state appears on Devices tab', (
-    tester,
-  ) async {
+  testWidgets('Developer Tools layout is inert', (tester) async {
     await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
@@ -141,19 +139,15 @@ void main() {
     await tester.tap(find.text('Offline'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('Emulator is enabled · offline · installed'),
-      findsOneWidget,
-    );
+    expect(find.text('Emulator logic is not implemented.'), findsOneWidget);
 
     await tester.pageBack();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Devices'));
     await tester.pumpAndSettle();
 
-    expect(find.text('WristLink Emulator'), findsOneWidget);
-    expect(find.text('offline'), findsOneWidget);
-    expect(find.text('connected'), findsNothing);
+    expect(find.text('No Garmin devices'), findsOneWidget);
+    expect(find.text('WristLink Emulator'), findsNothing);
   });
 }
 

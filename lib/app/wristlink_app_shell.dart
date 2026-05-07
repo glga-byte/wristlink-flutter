@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../features/developer_tools/domain/emulator_device_controller.dart';
 import '../features/developer_tools/presentation/developer_tools_screen.dart';
 import '../features/devices/data/device_settings_store.dart';
 import '../features/devices/data/local_device_directory.dart';
@@ -54,10 +53,7 @@ class _WristLinkAppShellState extends State<WristLinkAppShell> {
           SendScreen(deviceDirectory: _deviceDirectory),
           const QueueScreen(),
           devices.DevicesScreen(directory: _deviceDirectory),
-          SettingsScreen(
-            deviceDirectory: _deviceDirectory,
-            emulatorController: _deviceDirectory,
-          ),
+          SettingsScreen(deviceDirectory: _deviceDirectory),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -176,14 +172,9 @@ class QueueScreen extends StatelessWidget {
 }
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({
-    required this.deviceDirectory,
-    required this.emulatorController,
-    super.key,
-  });
+  const SettingsScreen({required this.deviceDirectory, super.key});
 
   final DeviceDirectoryController deviceDirectory;
-  final EmulatorDeviceController emulatorController;
 
   @override
   Widget build(BuildContext context) {
@@ -238,8 +229,7 @@ class SettingsScreen extends StatelessWidget {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) =>
-                      DeveloperToolsScreen(directory: emulatorController),
+                  builder: (_) => const DeveloperToolsScreen(),
                 ),
               );
             },
