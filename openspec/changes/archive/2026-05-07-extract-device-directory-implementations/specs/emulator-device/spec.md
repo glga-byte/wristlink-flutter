@@ -1,19 +1,4 @@
-## Purpose
-
-Define Developer Tools emulator-device behavior for exercising device-aware WristLink flows without a physical Garmin watch.
-
-## Requirements
-
-### Requirement: Emulator Device Setting
-The system SHALL provide a Developer Tools setting that enables or disables an emulator Garmin device.
-
-#### Scenario: User enables emulator device
-- **WHEN** the user turns on the emulator device setting
-- **THEN** the system persists emulator mode as enabled and creates an emulator-backed Garmin device in shared device state
-
-#### Scenario: User disables emulator device
-- **WHEN** the user turns off the emulator device setting
-- **THEN** the system persists emulator mode as disabled and removes the emulator-backed device from shared device state
+## MODIFIED Requirements
 
 ### Requirement: Emulator Device State Controls
 The system SHALL allow Developer Tools to set emulator reachability and companion install states through an emulator controller that updates the emulated directory implementation.

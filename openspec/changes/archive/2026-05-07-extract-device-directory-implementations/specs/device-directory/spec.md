@@ -1,34 +1,4 @@
-## Purpose
-
-Define the shared Garmin device domain and directory behavior used by device-aware WristLink screens and send-target resolution.
-
-## Requirements
-
-### Requirement: Shared Device Models
-The system SHALL define typed Dart models for Garmin devices that are reusable across Devices, Default Watch, Share Confirm, and future sending flows.
-
-#### Scenario: Device model represents physical watch
-- **WHEN** a native discovery adapter returns a physical Garmin device
-- **THEN** the system represents it with a stable device id, display name, physical source, reachability state, companion install state, and default selection state
-
-#### Scenario: Device model represents emulator watch
-- **WHEN** the emulator device is enabled
-- **THEN** the system represents it with a stable device id, emulator source, reachability state, companion install state, and default selection state
-
-### Requirement: Centralized Readiness Derivation
-The system SHALL derive device readiness from reachability and companion install state in the shared devices domain.
-
-#### Scenario: Device is ready
-- **WHEN** a device is reachable and the companion app is installed
-- **THEN** the system reports the device as ready for send-target selection
-
-#### Scenario: Device needs setup
-- **WHEN** a device is nearby or reachable and the companion app is missing
-- **THEN** the system reports the device as needing companion setup
-
-#### Scenario: Device is unavailable
-- **WHEN** a device is offline or has no current connection
-- **THEN** the system reports the device as unavailable for immediate sending
+## MODIFIED Requirements
 
 ### Requirement: Device Directory Service
 The system SHALL expose a shared mode-aware device directory service that provides effective devices, refresh behavior, default-device selection, and send-target readiness while delegating physical and emulated behavior to mode-specific directory implementations.
