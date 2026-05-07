@@ -76,22 +76,23 @@ void main() {
   test('falls back for unknown stored enum values', () async {
     values['authorizedDevices'] =
         '[{"id":"physical:unknown","name":"Unknown","source":"unexpected","reachability":"unexpected","companionInstallState":"unexpected"}]';
-    values['emulatorSettings'] =
-        '{"enabled":true,"reachability":"unexpected","companionInstallState":"unexpected"}';
     final store = MethodChannelDeviceSettingsStore(channel: channel);
 
     final devices = await store.readAuthorizedDevices();
-    final emulatorSettings = await store.readEmulatorSettings();
 
-    expect(devices.single.source, DeviceSource.physical);
     expect(devices.single.reachability, DeviceReachability.unknown);
     expect(devices.single.companionInstallState, CompanionInstallState.unknown);
-    expect(emulatorSettings.enabled, isTrue);
-    expect(emulatorSettings.reachability, DeviceReachability.reachable);
-    expect(
-      emulatorSettings.companionInstallState,
-      CompanionInstallState.installed,
-    );
+  });
+
+  test('ignores stored non-physical devices', () async {
+    values['authorizedDevices'] =
+        '[{"id":"emulator:old","name":"Old Emulator","reachability":"reachable","companionInstallState":"installed"},{"id":"physical:ok","name":"Forerunner","reachability":"reachable","companionInstallState":"installed"}]';
+    final store = MethodChannelDeviceSettingsStore(channel: channel);
+
+    final devices = await store.readAuthorizedDevices();
+
+    expect(devices, hasLength(1));
+    expect(devices.single.id, const GarminDeviceId('physical:ok'));
   });
 
   test('surfaces missing plugin failures instead of falling back', () async {

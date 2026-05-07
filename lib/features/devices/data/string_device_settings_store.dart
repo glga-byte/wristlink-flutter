@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import '../../developer_tools/domain/emulator_device_settings.dart';
 import '../domain/garmin_device.dart';
 import 'device_settings_store.dart';
 
@@ -9,7 +8,6 @@ abstract class StringDeviceSettingsStore implements DeviceSettingsStore {
 
   static const defaultDeviceKey = 'defaultDeviceId';
   static const authorizedDevicesKey = 'authorizedDevices';
-  static const emulatorSettingsKey = 'emulatorSettings';
 
   Future<String?> readString(String key);
 
@@ -57,50 +55,12 @@ abstract class StringDeviceSettingsStore implements DeviceSettingsStore {
     );
     await writeString(authorizedDevicesKey, value);
   }
-
-  @override
-  Future<EmulatorDeviceSettings> readEmulatorSettings() async {
-    final value = await readString(emulatorSettingsKey);
-    if (value == null || value.isEmpty) {
-      return const EmulatorDeviceSettings();
-    }
-
-    final decoded = _tryDecodeJson(value);
-    if (decoded is! Map) {
-      return const EmulatorDeviceSettings();
-    }
-    final settings = decoded.cast<String, Object?>();
-    return EmulatorDeviceSettings(
-      enabled: settings['enabled'] == true,
-      reachability: _enumByName(
-        DeviceReachability.values,
-        settings['reachability'],
-        DeviceReachability.reachable,
-      ),
-      companionInstallState: _enumByName(
-        CompanionInstallState.values,
-        settings['companionInstallState'],
-        CompanionInstallState.installed,
-      ),
-    );
-  }
-
-  @override
-  Future<void> writeEmulatorSettings(EmulatorDeviceSettings settings) async {
-    final value = jsonEncode({
-      'enabled': settings.enabled,
-      'reachability': settings.reachability.name,
-      'companionInstallState': settings.companionInstallState.name,
-    });
-    await writeString(emulatorSettingsKey, value);
-  }
 }
 
 Map<String, Object?> _deviceToJson(GarminDevice device) {
   return {
     'id': device.id.value,
     'name': device.name,
-    'source': device.source.name,
     'reachability': device.reachability.name,
     'companionInstallState': device.companionInstallState.name,
     'isDefault': device.isDefault,
@@ -116,7 +76,7 @@ Map<String, Object?> _deviceToJson(GarminDevice device) {
 
 GarminDevice? _deviceFromJson(Map<String, Object?> json) {
   final id = json['id'] as String?;
-  if (id == null || id.trim().isEmpty) {
+  if (id == null || id.trim().isEmpty || !id.startsWith('physical:')) {
     return null;
   }
 
@@ -130,11 +90,6 @@ GarminDevice? _deviceFromJson(Map<String, Object?> json) {
   return GarminDevice(
     id: GarminDeviceId(id),
     name: json['name'] as String? ?? 'Garmin device',
-    source: _enumByName(
-      DeviceSource.values,
-      json['source'],
-      DeviceSource.physical,
-    ),
     reachability: _enumByName(
       DeviceReachability.values,
       json['reachability'],

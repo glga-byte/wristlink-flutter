@@ -1,108 +1,83 @@
 import 'package:flutter/material.dart';
 
 import '../../devices/domain/garmin_device.dart';
-import '../domain/emulator_device_controller.dart';
-import '../domain/emulator_device_settings.dart';
 
 class DeveloperToolsScreen extends StatelessWidget {
-  const DeveloperToolsScreen({required this.directory, super.key});
-
-  final EmulatorDeviceController directory;
+  const DeveloperToolsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Developer Tools')),
-      body: AnimatedBuilder(
-        animation: directory,
-        builder: (context, _) {
-          final settings = directory.emulatorSettings;
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-            children: [
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text(
-                  'Emulator device',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-                subtitle: const Text('Override Garmin discovery for app flows'),
-                value: settings.enabled,
-                onChanged: (enabled) {
-                  directory.updateEmulatorSettings(
-                    settings.copyWith(enabled: enabled),
-                  );
-                },
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'Emulator device',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            subtitle: const Text('Override Garmin discovery for app flows'),
+            value: false,
+            onChanged: (_) {},
+          ),
+          const SizedBox(height: 24),
+          const _SectionLabel('REACHABILITY'),
+          const SizedBox(height: 10),
+          _ModeGrid<DeviceReachability>(
+            value: DeviceReachability.reachable,
+            options: const [
+              _ModeOption(
+                value: DeviceReachability.reachable,
+                label: 'Reachable',
+                icon: Icons.wifi_tethering,
               ),
-              const SizedBox(height: 24),
-              const _SectionLabel('REACHABILITY'),
-              const SizedBox(height: 10),
-              _ModeGrid<DeviceReachability>(
-                value: settings.reachability,
-                options: const [
-                  _ModeOption(
-                    value: DeviceReachability.reachable,
-                    label: 'Reachable',
-                    icon: Icons.wifi_tethering,
-                  ),
-                  _ModeOption(
-                    value: DeviceReachability.offline,
-                    label: 'Offline',
-                    icon: Icons.wifi_off,
-                  ),
-                  _ModeOption(
-                    value: DeviceReachability.sending,
-                    label: 'Sending',
-                    icon: Icons.sync,
-                  ),
-                  _ModeOption(
-                    value: DeviceReachability.failed,
-                    label: 'Failed',
-                    icon: Icons.error_outline,
-                  ),
-                ],
-                onChanged: (value) {
-                  directory.updateEmulatorSettings(
-                    settings.copyWith(enabled: true, reachability: value),
-                  );
-                },
+              _ModeOption(
+                value: DeviceReachability.offline,
+                label: 'Offline',
+                icon: Icons.wifi_off,
               ),
-              const SizedBox(height: 28),
-              const _SectionLabel('COMPANION APP'),
-              const SizedBox(height: 10),
-              _ModeGrid<CompanionInstallState>(
-                value: settings.companionInstallState,
-                options: const [
-                  _ModeOption(
-                    value: CompanionInstallState.installed,
-                    label: 'Installed',
-                    icon: Icons.check_circle_outline,
-                  ),
-                  _ModeOption(
-                    value: CompanionInstallState.missing,
-                    label: 'Missing',
-                    icon: Icons.do_not_disturb_on_outlined,
-                  ),
-                  _ModeOption(
-                    value: CompanionInstallState.unknown,
-                    label: 'Unknown',
-                    icon: Icons.help_outline,
-                  ),
-                ],
-                onChanged: (value) {
-                  directory.updateEmulatorSettings(
-                    settings.copyWith(
-                      enabled: true,
-                      companionInstallState: value,
-                    ),
-                  );
-                },
+              _ModeOption(
+                value: DeviceReachability.sending,
+                label: 'Sending',
+                icon: Icons.sync,
               ),
-              const SizedBox(height: 28),
-              _CurrentState(settings: settings),
+              _ModeOption(
+                value: DeviceReachability.failed,
+                label: 'Failed',
+                icon: Icons.error_outline,
+              ),
             ],
-          );
-        },
+            onChanged: (_) {},
+          ),
+          const SizedBox(height: 28),
+          const _SectionLabel('COMPANION APP'),
+          const SizedBox(height: 10),
+          _ModeGrid<CompanionInstallState>(
+            value: CompanionInstallState.installed,
+            options: const [
+              _ModeOption(
+                value: CompanionInstallState.installed,
+                label: 'Installed',
+                icon: Icons.check_circle_outline,
+              ),
+              _ModeOption(
+                value: CompanionInstallState.missing,
+                label: 'Missing',
+                icon: Icons.do_not_disturb_on_outlined,
+              ),
+              _ModeOption(
+                value: CompanionInstallState.unknown,
+                label: 'Unknown',
+                icon: Icons.help_outline,
+              ),
+            ],
+            onChanged: (_) {},
+          ),
+          const SizedBox(height: 28),
+          const _CurrentState(),
+        ],
       ),
     );
   }
@@ -235,13 +210,10 @@ class _ModeButton<T> extends StatelessWidget {
 }
 
 class _CurrentState extends StatelessWidget {
-  const _CurrentState({required this.settings});
-
-  final EmulatorDeviceSettings settings;
+  const _CurrentState();
 
   @override
   Widget build(BuildContext context) {
-    final enabled = settings.enabled ? 'enabled' : 'disabled';
     return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color(0xFFF7F7F4),
@@ -250,9 +222,7 @@ class _CurrentState extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Text(
-          'Emulator is $enabled · ${settings.reachability.name} · ${settings.companionInstallState.name}',
-        ),
+        child: const Text('Emulator logic is not implemented.'),
       ),
     );
   }

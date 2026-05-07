@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wristlink_flutter/features/developer_tools/domain/emulator_device_settings.dart';
 import 'package:wristlink_flutter/features/developer_tools/presentation/developer_tools_screen.dart';
 import 'package:wristlink_flutter/features/devices/data/in_memory_device_settings_store.dart';
 import 'package:wristlink_flutter/features/devices/data/local_device_directory.dart';
@@ -46,9 +45,7 @@ void main() {
     expect(find.text('No Garmin devices'), findsOneWidget);
   });
 
-  testWidgets('Devices tab renders refresh errors and emulator state', (
-    tester,
-  ) async {
+  testWidgets('Devices tab renders refresh errors', (tester) async {
     final errorDirectory = LocalDeviceDirectory(
       store: InMemoryDeviceSettingsStore(authorizedDevices: const []),
       discoveryGateway: const _ErrorGateway(),
@@ -62,47 +59,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Garmin Connect is not installed.'), findsOneWidget);
-
-    final emulatorDirectory = LocalDeviceDirectory(
-      store: InMemoryDeviceSettingsStore(
-        emulatorSettings: const EmulatorDeviceSettings(enabled: true),
-      ),
-    );
-    await emulatorDirectory.load();
-
-    await tester.pumpWidget(
-      _App(child: DevicesScreen(directory: emulatorDirectory)),
-    );
-
-    expect(find.text('WristLink Emulator'), findsOneWidget);
-    expect(find.textContaining('Emulator'), findsWidgets);
-  });
-
-  testWidgets('Devices tab reacts when emulator becomes offline', (
-    tester,
-  ) async {
-    final directory = LocalDeviceDirectory(
-      store: InMemoryDeviceSettingsStore(
-        emulatorSettings: const EmulatorDeviceSettings(enabled: true),
-      ),
-    );
-    await directory.load();
-
-    await tester.pumpWidget(_App(child: DevicesScreen(directory: directory)));
-
-    expect(find.text('connected'), findsOneWidget);
-
-    await directory.updateEmulatorSettings(
-      const EmulatorDeviceSettings(
-        enabled: true,
-        reachability: DeviceReachability.offline,
-        companionInstallState: CompanionInstallState.installed,
-      ),
-    );
-    await tester.pump();
-
-    expect(find.text('connected'), findsNothing);
-    expect(find.text('offline'), findsOneWidget);
   });
 
   testWidgets('Default Watch screen updates shared default selection', (
@@ -125,30 +81,28 @@ void main() {
     expect(directory.defaultDeviceId, fixtureSetupDevice.id);
   });
 
-  testWidgets('Developer Tools controls update emulator device state', (
-    tester,
-  ) async {
+  testWidgets('Developer Tools controls are inert', (tester) async {
     final directory = LocalDeviceDirectory(
       store: InMemoryDeviceSettingsStore(
-        emulatorSettings: const EmulatorDeviceSettings(enabled: true),
+        defaultDeviceId: fixtureReadyDevice.id,
+        authorizedDevices: const [fixtureReadyDevice],
       ),
     );
     await directory.load();
+    final initialDevices = directory.devices;
 
-    await tester.pumpWidget(
-      _App(child: DeveloperToolsScreen(directory: directory)),
-    );
+    await tester.pumpWidget(const _App(child: DeveloperToolsScreen()));
 
     await tester.tap(find.text('Offline'));
     await tester.pumpAndSettle();
-    expect(directory.emulatorSettings.reachability, DeviceReachability.offline);
 
     await tester.tap(find.text('Missing'));
     await tester.pumpAndSettle();
-    expect(
-      directory.emulatorSettings.companionInstallState,
-      CompanionInstallState.missing,
-    );
+
+    expect(find.text('Emulator logic is not implemented.'), findsOneWidget);
+    expect(directory.devices, initialDevices);
+    expect(directory.defaultDeviceId, fixtureReadyDevice.id);
+    expect(directory.resolveSendTarget(), isA<SendTargetReady>());
   });
 
   testWidgets('Send screen consumes shared send-target resolution', (
@@ -156,8 +110,8 @@ void main() {
   ) async {
     final directory = LocalDeviceDirectory(
       store: InMemoryDeviceSettingsStore(
-        defaultDeviceId: const GarminDeviceId('emulator:wristlink-dev-watch'),
-        emulatorSettings: const EmulatorDeviceSettings(enabled: true),
+        defaultDeviceId: fixtureReadyDevice.id,
+        authorizedDevices: const [fixtureReadyDevice],
       ),
     );
     await directory.load();
@@ -166,21 +120,13 @@ void main() {
       _App(child: SendScreen(deviceDirectory: directory)),
     );
 
-    expect(find.text('WristLink Emulator found'), findsOneWidget);
+    expect(find.text('Forerunner 965 found'), findsOneWidget);
     expect(find.text('Companion app installed'), findsOneWidget);
 
-    await directory.updateEmulatorSettings(
-      const EmulatorDeviceSettings(
-        enabled: true,
-        reachability: DeviceReachability.offline,
-        companionInstallState: CompanionInstallState.installed,
-      ),
-    );
+    await directory.refreshDevices();
     await tester.pump();
 
-    expect(find.text('WristLink Emulator found'), findsNothing);
-    expect(find.text('WristLink Emulator not ready'), findsOneWidget);
-    expect(find.text('Companion app not confirmed'), findsOneWidget);
+    expect(find.text('Forerunner 965 found'), findsOneWidget);
   });
 }
 

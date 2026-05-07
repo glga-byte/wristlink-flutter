@@ -1,6 +1,6 @@
 ## Purpose
 
-Define durable device settings storage behavior and platform provider selection for default watch, authorized devices, and emulator settings.
+Define durable device settings storage behavior and platform provider selection for default watch and authorized physical devices.
 
 ## Requirements
 
@@ -9,11 +9,11 @@ The system SHALL choose a `DeviceSettingsStore` implementation explicitly for ea
 
 #### Scenario: Mobile app uses native settings channel
 - **WHEN** the app runs on iOS or Android
-- **THEN** the system uses the `wristlink/device_settings` method-channel-backed store for default watch, authorized devices, and emulator settings
+- **THEN** the system uses the `wristlink/device_settings` method-channel-backed store for default watch and authorized physical devices
 
 #### Scenario: Web app uses browser settings storage
 - **WHEN** the app runs on web
-- **THEN** the system uses a web-backed store that persists default watch, authorized devices, and emulator settings in durable browser storage
+- **THEN** the system uses a web-backed store that persists default watch and authorized physical devices in durable browser storage
 
 #### Scenario: Unsupported desktop platforms are out of scope
 - **WHEN** the app runs on Windows or Linux before platform support is added
@@ -36,10 +36,6 @@ The system SHALL keep device settings payload mapping in Dart and store platform
 #### Scenario: Authorized devices are persisted
 - **WHEN** the system stores authorized Garmin devices on iOS, Android, or web
 - **THEN** the system writes the normalized authorized-device JSON string under the shared authorized devices key
-
-#### Scenario: Emulator settings are persisted
-- **WHEN** the system stores emulator settings on iOS, Android, or web
-- **THEN** the system writes the normalized emulator settings JSON string under the shared emulator settings key
 
 #### Scenario: Default watch is persisted
 - **WHEN** the system stores a default watch on iOS, Android, or web

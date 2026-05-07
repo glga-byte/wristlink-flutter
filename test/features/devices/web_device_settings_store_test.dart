@@ -8,7 +8,6 @@ import 'dart:html' as html;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wristlink_flutter/app/platform/device_settings_store_provider.dart';
-import 'package:wristlink_flutter/features/developer_tools/domain/emulator_device_settings.dart';
 import 'package:wristlink_flutter/features/devices/data/string_device_settings_store.dart';
 import 'package:wristlink_flutter/features/devices/data/web_device_settings_store.dart';
 import 'package:wristlink_flutter/features/devices/domain/garmin_device.dart';
@@ -20,9 +19,6 @@ void main() {
     html.window.localStorage.remove(StringDeviceSettingsStore.defaultDeviceKey);
     html.window.localStorage.remove(
       StringDeviceSettingsStore.authorizedDevicesKey,
-    );
-    html.window.localStorage.remove(
-      StringDeviceSettingsStore.emulatorSettingsKey,
     );
   });
 
@@ -47,7 +43,6 @@ void main() {
     const device = GarminDevice(
       id: GarminDeviceId('physical:web-ready'),
       name: 'Web Ready',
-      source: DeviceSource.physical,
       reachability: DeviceReachability.reachable,
       companionInstallState: CompanionInstallState.installed,
       metadata: GarminDeviceMetadata(
@@ -78,29 +73,6 @@ void main() {
     expect(nativePayload, {'safe': 'value'});
   });
 
-  test('persists emulator settings in browser storage', () async {
-    const settings = EmulatorDeviceSettings(
-      enabled: true,
-      reachability: DeviceReachability.offline,
-      companionInstallState: CompanionInstallState.missing,
-    );
-
-    await store.writeEmulatorSettings(settings);
-
-    expect(
-      html.window.localStorage[StringDeviceSettingsStore.emulatorSettingsKey],
-      contains('"enabled":true'),
-    );
-    final storedSettings = await store.readEmulatorSettings();
-
-    expect(storedSettings.enabled, settings.enabled);
-    expect(storedSettings.reachability, settings.reachability);
-    expect(
-      storedSettings.companionInstallState,
-      settings.companionInstallState,
-    );
-  });
-
   test('handles malformed payloads and unknown enum values', () async {
     await store.writeString(
       StringDeviceSettingsStore.authorizedDevicesKey,
@@ -112,22 +84,10 @@ void main() {
       StringDeviceSettingsStore.authorizedDevicesKey,
       '[{"id":"physical:unknown","name":"Unknown","source":"unexpected","reachability":"unexpected","companionInstallState":"unexpected"}]',
     );
-    await store.writeString(
-      StringDeviceSettingsStore.emulatorSettingsKey,
-      '{"enabled":true,"reachability":"unexpected","companionInstallState":"unexpected"}',
-    );
 
     final devices = await store.readAuthorizedDevices();
-    final emulatorSettings = await store.readEmulatorSettings();
 
-    expect(devices.single.source, DeviceSource.physical);
     expect(devices.single.reachability, DeviceReachability.unknown);
     expect(devices.single.companionInstallState, CompanionInstallState.unknown);
-    expect(emulatorSettings.enabled, isTrue);
-    expect(emulatorSettings.reachability, DeviceReachability.reachable);
-    expect(
-      emulatorSettings.companionInstallState,
-      CompanionInstallState.installed,
-    );
   });
 }

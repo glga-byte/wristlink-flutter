@@ -20,7 +20,7 @@ lib/
   app/                 # App initialization, routing, DI
   features/
     devices/           # Shared device models, directory/repository, readiness, default watch
-    developer_tools/   # Emulator device settings and bridge-state controls
+    developer_tools/   # Presentational Developer Tools settings UI
     send_queue/        # Send queue and task statuses
     garmin_bridge/     # Typed Dart API over Android/iOS Garmin SDK Platform Channels
     payloads/          # Models for points, timers, notes, commands
@@ -41,9 +41,10 @@ integration_test/      # Integration scenarios when needed
 - Keep business logic in Dart; use native Android/iOS code only for Garmin SDK adapters, platform callbacks, and platform background services.
 - Wrap Platform Channels in a typed Dart API; do not call channels directly from UI code.
 - Device-aware UI must use shared device models and services; do not keep separate screen-local device state for Devices, Default Watch, Share Confirm, or send readiness.
-- Model Garmin devices, emulator devices, default-watch selection, companion install state, and reachability in shared Dart domain types with explicit mapping from native SDK and storage payloads.
-- Device-aware Flutter screens must consume `DeviceDirectory` and presentation mappers under `lib/features/devices/`; keep emulator override behavior inside directory composition rather than branching in individual screens.
-- Default watch, latest authorized devices, and emulator settings use explicit platform `DeviceSettingsStore` providers: Android/iOS persist through the required `wristlink/device_settings` Platform Channel, web persists through the web-backed store, and unsupported platforms must surface unsupported storage instead of silently falling back to volatile memory. Keep native/web storage as simple key/value persistence and JSON mapping in Dart.
+- Model Garmin devices, default-watch selection, companion install state, and reachability in shared Dart domain types with explicit mapping from native SDK and storage payloads.
+- Device-aware Flutter screens must consume `DeviceDirectory` and presentation mappers under `lib/features/devices/`.
+- Emulator device logic is intentionally absent. The Developer Tools settings surface is currently presentational only and must not create devices, persist emulator settings, override discovery, change the default watch, or affect send readiness until a future change reintroduces emulator behavior from scratch.
+- Default watch and latest authorized devices use explicit platform `DeviceSettingsStore` providers: Android/iOS persist through the required `wristlink/device_settings` Platform Channel, web persists through the web-backed store, and unsupported platforms must surface unsupported storage instead of silently falling back to volatile memory. Keep native/web storage as simple key/value persistence and JSON mapping in Dart.
 - Native Garmin discovery uses the `wristlink/garmin_devices` Platform Channel. Companion install checks require configuring the separate Connect IQ watch app UUID in Android manifest metadata `com.wristlink.CONNECT_IQ_APP_ID` and iOS `WristLinkConnectIQAppUUID`; placeholder UUIDs intentionally map companion state to unknown.
 - Native Garmin device status changes use the `wristlink/garmin_device_events` Event Channel and must update `DeviceDirectory` through the typed Dart Garmin discovery gateway; do not keep status callbacks native-only.
 - On iOS, Garmin device discovery uses Garmin Connect Mobile handoff/callback. Cache only the latest authorized device list and handle cancellation, missing Garmin Connect, timeouts, and app suspension as typed domain outcomes.

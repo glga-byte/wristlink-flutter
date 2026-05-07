@@ -28,7 +28,6 @@ class DeviceRowModel {
     required this.statusColor,
     required this.accentColor,
     required this.isDefault,
-    required this.source,
   });
 
   final GarminDeviceId id;
@@ -38,7 +37,6 @@ class DeviceRowModel {
   final Color statusColor;
   final Color accentColor;
   final bool isDefault;
-  final DeviceSource source;
 }
 
 DevicesPresentation mapDevicesPresentation({
@@ -72,12 +70,10 @@ DeviceRowModel mapDeviceRow(GarminDevice device) {
     statusColor: _statusColor(device),
     accentColor: _accentColor(device),
     isDefault: device.isDefault,
-    source: device.source,
   );
 }
 
 String _detail(GarminDevice device) {
-  final source = device.source == DeviceSource.emulator ? 'Emulator' : null;
   final reachability = switch (device.reachability) {
     DeviceReachability.reachable => 'Reachable now',
     DeviceReachability.nearby => 'Nearby',
@@ -93,7 +89,6 @@ String _detail(GarminDevice device) {
   };
   final defaultLabel = device.isDefault ? 'Default watch' : null;
   return [
-    source,
     defaultLabel,
     reachability,
     companion,
@@ -123,9 +118,6 @@ Color _statusColor(GarminDevice device) {
 }
 
 Color _accentColor(GarminDevice device) {
-  if (device.source == DeviceSource.emulator) {
-    return const Color(0xFFFFCF33);
-  }
   if (device.isDefault && device.isReady) {
     return const Color(0xFF111111);
   }

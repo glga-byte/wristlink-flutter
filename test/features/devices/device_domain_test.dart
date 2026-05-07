@@ -50,7 +50,6 @@ void main() {
     ]);
 
     expect(devices.single.id, const GarminDeviceId('physical:123'));
-    expect(devices.single.source, DeviceSource.physical);
     expect(devices.single.reachability, DeviceReachability.reachable);
     expect(
       devices.single.companionInstallState,
@@ -137,14 +136,9 @@ void main() {
 
   test('derives presentation colors outside device domain models', () {
     final readyRow = mapDeviceRow(fixtureReadyDevice);
-    final emulatorRow = mapDeviceRow(
-      fixtureReadyDevice.copyWith(
-        id: const GarminDeviceId('emulator:test'),
-        source: DeviceSource.emulator,
-      ),
-    );
+    final setupRow = mapDeviceRow(fixtureSetupDevice);
 
     expect(readyRow.accentColor, const Color(0xFF111111));
-    expect(emulatorRow.accentColor, const Color(0xFFFFCF33));
+    expect(setupRow.accentColor, const Color(0xFFD8444A));
   });
 }

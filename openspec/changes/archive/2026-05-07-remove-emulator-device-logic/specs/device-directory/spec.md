@@ -1,8 +1,4 @@
-## Purpose
-
-Define the shared physical Garmin device domain and directory behavior used by device-aware WristLink screens and send-target resolution.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Shared Device Models
 The system SHALL define typed Dart models for physical Garmin devices that are reusable across Devices, Default Watch, Share Confirm, and future sending flows.
@@ -10,21 +6,6 @@ The system SHALL define typed Dart models for physical Garmin devices that are r
 #### Scenario: Device model represents physical watch
 - **WHEN** a native discovery adapter returns a physical Garmin device
 - **THEN** the system represents it with a stable device id, display name, reachability state, companion install state, and default selection state
-
-### Requirement: Centralized Readiness Derivation
-The system SHALL derive device readiness from reachability and companion install state in the shared devices domain.
-
-#### Scenario: Device is ready
-- **WHEN** a device is reachable and the companion app is installed
-- **THEN** the system reports the device as ready for send-target selection
-
-#### Scenario: Device needs setup
-- **WHEN** a device is nearby or reachable and the companion app is missing
-- **THEN** the system reports the device as needing companion setup
-
-#### Scenario: Device is unavailable
-- **WHEN** a device is offline or has no current connection
-- **THEN** the system reports the device as unavailable for immediate sending
 
 ### Requirement: Device Directory Service
 The system SHALL expose a shared local device directory service that provides physical devices, refresh behavior, default-device selection, and send-target readiness.
@@ -66,3 +47,9 @@ The system SHALL provide send-target resolution through the shared local device 
 #### Scenario: Active default watch is not ready
 - **WHEN** the active default watch is offline or missing the companion app
 - **THEN** the system returns a typed unavailable reason for Share Confirm and future queue behavior
+
+## REMOVED Requirements
+
+### Requirement: Emulator Mode Directory Behavior
+**Reason**: Emulator device behavior is intentionally removed so it can be rebuilt later from a clean boundary.
+**Migration**: Use the physical-only local device directory. Developer Tools UI must not affect device directory behavior until a future emulator implementation is specified.

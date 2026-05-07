@@ -98,7 +98,6 @@ GarminDevice mapNativeDevice(Map<Object?, Object?> payload) {
   return GarminDevice(
     id: GarminDeviceId('physical:$id'),
     name: name,
-    source: DeviceSource.physical,
     reachability: _reachability(payload['reachability']),
     companionInstallState: _companion(payload['companionInstallState']),
     metadata: GarminDeviceMetadata(
