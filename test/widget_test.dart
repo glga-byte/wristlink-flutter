@@ -1,8 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wristlink_flutter/app/wristlink_app.dart';
 
 void main() {
+  const garminDevicesChannel = MethodChannel('wristlink/garmin_devices');
+  const deviceSettingsChannel = MethodChannel('wristlink/device_settings');
+  final settings = <String, String>{};
+
+  setUp(() {
+    settings.clear();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(deviceSettingsChannel, (call) async {
+          final arguments = call.arguments as Map<Object?, Object?>?;
+          final key = arguments?['key'] as String?;
+          switch (call.method) {
+            case 'readString':
+              return settings[key];
+            case 'writeString':
+              settings[key!] = arguments?['value'] as String;
+              return null;
+          }
+          return null;
+        });
+  });
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(garminDevicesChannel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(deviceSettingsChannel, null);
+  });
+
   testWidgets('renders the primary tab scaffold and initial Send destination', (
     tester,
   ) async {
@@ -23,6 +52,9 @@ void main() {
     expect(find.byIcon(Icons.add_location_alt_outlined), findsOneWidget);
     expect(find.text('Timer'), findsOneWidget);
     expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.text('Note'), 120);
+
     expect(find.text('Note'), findsOneWidget);
     expect(find.byIcon(Icons.description_outlined), findsOneWidget);
 
@@ -55,22 +87,84 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('GARMIN CONNECT IQ'), findsOneWidget);
-    expect(find.text('connected'), findsOneWidget);
-    expect(find.text('setup'), findsOneWidget);
-    expect(find.text('offline'), findsOneWidget);
-    expect(find.text('Forerunner 965'), findsOneWidget);
-    expect(find.text('Fenix 7'), findsOneWidget);
-    expect(find.text('Venu 3'), findsOneWidget);
+    expect(find.text('No Garmin devices'), findsOneWidget);
+    expect(
+      find.text('Refresh to authorize Garmin Connect IQ devices.'),
+      findsOneWidget,
+    );
+    expect(find.text('Forerunner 965'), findsNothing);
+    expect(find.text('Fenix 7'), findsNothing);
+    expect(find.text('Venu 3'), findsNothing);
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
     expect(find.text('WRISTLINK'), findsOneWidget);
     expect(find.text('Default watch'), findsOneWidget);
+    expect(find.text('Choose target watch'), findsOneWidget);
     expect(find.text('Background sending'), findsOneWidget);
     expect(find.text('Retry when watch reconnects'), findsOneWidget);
     expect(find.text('Developer Tools'), findsOneWidget);
     expect(find.text('Emulator device and bridge states'), findsOneWidget);
     expect(find.text('About WristLink'), findsOneWidget);
+  });
+
+  testWidgets('Devices refresh calls the native Garmin discovery channel', (
+    tester,
+  ) async {
+    final calls = <String>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(garminDevicesChannel, (call) async {
+          calls.add(call.method);
+          return [
+            {
+              'id': 'native-test-watch',
+              'name': 'Native Test Watch',
+              'reachability': 'reachable',
+              'companionInstallState': 'installed',
+            },
+          ];
+        });
+
+    await tester.pumpWidget(const WristLinkApp());
+
+    await tester.tap(find.text('Devices'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.refresh_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(calls, ['discoverDevices']);
+    expect(find.text('Native Test Watch'), findsOneWidget);
+    expect(find.text('connected'), findsOneWidget);
+  });
+
+  testWidgets('Developer Tools offline state appears on Devices tab', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const WristLinkApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Developer Tools'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Offline'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Emulator is enabled · offline · installed'),
+      findsOneWidget,
+    );
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Devices'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('WristLink Emulator'), findsOneWidget);
+    expect(find.text('offline'), findsOneWidget);
+    expect(find.text('connected'), findsNothing);
   });
 }

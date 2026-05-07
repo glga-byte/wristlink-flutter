@@ -22,10 +22,31 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.wristlink.garmin-callback</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>wristlink-ciq</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>gcm-ciq</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>WristLink uses Garmin Connect IQ to discover authorized watches for sending data.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>WristLink uses Garmin Connect IQ to discover authorized watches for sending data.</string>
+	<key>WristLinkConnectIQAppUUID</key>
+	<string>00000000-0000-0000-0000-000000000000</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

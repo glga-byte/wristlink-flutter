@@ -44,11 +44,11 @@ The system SHALL provide a Queue destination that presents static queue progress
 - **THEN** the system shows queue summary counts and example command statuses including queued, sending, failed, and delivered
 
 ### Requirement: Devices Destination Placeholder
-The system SHALL provide a Devices destination that presents static Garmin device readiness examples.
+The system SHALL provide a Devices destination that renders the implemented Garmin device readiness screen using the shared device directory.
 
 #### Scenario: Devices destination renders
 - **WHEN** the user opens the Devices destination
-- **THEN** the system shows example Garmin devices with connection, setup, and offline readiness states
+- **THEN** the system shows Garmin devices from the shared device directory with connection, setup, companion install, default watch, emulator, and offline readiness states as available
 
 ### Requirement: Basic Home Screen
 The system SHALL provide a Send destination as the initial user-facing app surface that identifies the primary "send to watch" workflow.
@@ -72,15 +72,15 @@ The system SHALL show meaningful icons for Send home quick actions matching the 
 - **THEN** the share-from-Maps, manual point, timer, note, and command actions each show an icon consistent with their action type
 
 ### Requirement: Settings Destination Placeholder
-The system SHALL provide a Settings destination placeholder in the primary tab scaffold with visible rows for default watch, background sending, Developer Tools, and app information.
+The system SHALL provide a Settings destination in the primary tab scaffold with visible rows for default watch, background sending, Developer Tools, and app information.
 
 #### Scenario: Settings destination renders
 - **WHEN** the user opens the Settings destination
-- **THEN** the system shows settings rows for `Default watch`, `Background sending`, `Developer Tools`, and `About WristLink` without requiring any persisted preferences
+- **THEN** the system shows settings rows for `Default watch`, `Background sending`, `Developer Tools`, and `About WristLink`
 
-#### Scenario: Developer Tools setting is placeholder only
-- **WHEN** the user opens the Settings destination
-- **THEN** the system shows `Developer Tools` with supporting text `Emulator device and bridge states` without showing Developer Tools behavior, emulator controls, or bridge state details
+#### Scenario: Developer Tools setting opens emulator controls
+- **WHEN** the user opens `Developer Tools`
+- **THEN** the system provides emulator device controls that can affect the shared device directory
 
 ### Requirement: Baseline Widget Test Coverage
 The system SHALL include baseline widget tests for the app shell, primary navigation, and placeholder destination content.

@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../features/developer_tools/domain/emulator_device_controller.dart';
+import '../features/developer_tools/presentation/developer_tools_screen.dart';
+import '../features/devices/data/local_device_directory.dart';
+import '../features/devices/data/method_channel_device_settings_store.dart';
+import '../features/devices/domain/device_directory.dart';
+import '../features/devices/presentation/devices_screen.dart' as devices;
+import '../features/garmin_bridge/garmin_device_discovery_gateway.dart';
 import '../features/home/home_screen.dart';
 
 class WristLinkAppShell extends StatefulWidget {
@@ -11,18 +18,38 @@ class WristLinkAppShell extends StatefulWidget {
 
 class _WristLinkAppShellState extends State<WristLinkAppShell> {
   var _selectedIndex = 0;
+  late final LocalDeviceDirectory _deviceDirectory;
 
-  static const _destinations = <Widget>[
-    SendScreen(),
-    QueueScreen(),
-    DevicesScreen(),
-    SettingsScreen(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _deviceDirectory = LocalDeviceDirectory(
+      store: MethodChannelDeviceSettingsStore(),
+      discoveryGateway: MethodChannelGarminDeviceDiscoveryGateway(),
+    )..load();
+  }
+
+  @override
+  void dispose() {
+    _deviceDirectory.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: _destinations),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          SendScreen(deviceDirectory: _deviceDirectory),
+          const QueueScreen(),
+          devices.DevicesScreen(directory: _deviceDirectory),
+          SettingsScreen(
+            deviceDirectory: _deviceDirectory,
+            emulatorController: _deviceDirectory,
+          ),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
@@ -69,7 +96,7 @@ class QueueScreen extends StatelessWidget {
     _QueueItem(
       color: Color(0xFF2F7D80),
       title: 'Coffee meet point',
-      detail: 'Point · sending to Forerunner 965',
+      detail: 'Point · sending to default watch',
       status: 'sending',
     ),
     _QueueItem(
@@ -138,69 +165,15 @@ class QueueScreen extends StatelessWidget {
   }
 }
 
-class DevicesScreen extends StatelessWidget {
-  const DevicesScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-        children: [
-          const _SectionLabel('GARMIN CONNECT IQ'),
-          const SizedBox(height: 8),
-          Text(
-            'Devices',
-            style: textTheme.displaySmall?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 22),
-          const _FeaturedDevice(),
-          const SizedBox(height: 20),
-          const Divider(height: 1),
-          const _DeviceListItem(
-            color: Color(0xFF2F7D80),
-            title: 'Fenix 7',
-            detail: 'Nearby · companion missing',
-            status: 'setup',
-            statusColor: Color(0xFFD8444A),
-          ),
-          const _DeviceListItem(
-            color: Color(0xFFD6D6D1),
-            title: 'Venu 3',
-            detail: 'Offline · last seen yesterday',
-            status: 'offline',
-            statusColor: Color(0xFF6F6F69),
-          ),
-          const SizedBox(height: 30),
-          const _SectionLabel('BEFORE SENDING'),
-          const SizedBox(height: 14),
-          const Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: EdgeInsets.only(top: 7),
-                child: _StatusDot(color: Color(0xFF2F7D80), size: 8),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Check companion install per device and use the default reachable watch first.',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({
+    required this.deviceDirectory,
+    required this.emulatorController,
+    super.key,
+  });
+
+  final DeviceDirectoryController deviceDirectory;
+  final EmulatorDeviceController emulatorController;
 
   @override
   Widget build(BuildContext context) {
@@ -219,22 +192,47 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          const _SettingsRow(
-            icon: Icons.watch_outlined,
-            title: 'Default watch',
-            detail: 'Forerunner 965',
+          AnimatedBuilder(
+            animation: deviceDirectory,
+            builder: (context, _) {
+              final defaultDevice = deviceDirectory.devices
+                  .where((device) => device.isDefault)
+                  .firstOrNull;
+              return _SettingsRow(
+                icon: Icons.watch_outlined,
+                title: 'Default watch',
+                detail: defaultDevice?.name ?? 'Choose target watch',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => devices.DefaultWatchScreen(
+                        directory: deviceDirectory,
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
           ),
           const _SettingsRow(
             icon: Icons.sync_outlined,
             title: 'Background sending',
             detail: 'Retry when watch reconnects',
           ),
-          const _SettingsRow(
+          _SettingsRow(
             icon: Icons.code_rounded,
             title: 'Developer Tools',
             detail: 'Emulator device and bridge states',
             iconColor: Color(0xFFFFCF33),
             iconBackgroundColor: Color(0xFF111111),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      DeveloperToolsScreen(directory: emulatorController),
+                ),
+              );
+            },
           ),
           const _SettingsRow(
             icon: Icons.info_outline,
@@ -376,169 +374,6 @@ class _QueueListItem extends StatelessWidget {
   }
 }
 
-class _FeaturedDevice extends StatelessWidget {
-  const _FeaturedDevice();
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFF111111),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Forerunner 965',
-                    style: textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFCF33),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    child: Text(
-                      'connected',
-                      style: textTheme.labelMedium?.copyWith(
-                        color: const Color(0xFF111111),
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Default watch',
-              style: textTheme.bodyMedium?.copyWith(color: Colors.white70),
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: const [
-                _DarkChip('Companion installed'),
-                _DarkChip('Reachable now'),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DarkChip extends StatelessWidget {
-  const _DarkChip(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.white38),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        child: Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.labelMedium?.copyWith(color: Colors.white),
-        ),
-      ),
-    );
-  }
-}
-
-class _DeviceListItem extends StatelessWidget {
-  const _DeviceListItem({
-    required this.color,
-    required this.title,
-    required this.detail,
-    required this.status,
-    required this.statusColor,
-  });
-
-  final Color color;
-  final String title;
-  final String detail;
-  final String status;
-  final Color statusColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Row(
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const SizedBox.square(dimension: 36),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      detail,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF6F6F69),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                status,
-                style: textTheme.labelLarge?.copyWith(
-                  color: statusColor,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const Divider(height: 1),
-      ],
-    );
-  }
-}
-
 class _SettingsRow extends StatelessWidget {
   const _SettingsRow({
     required this.icon,
@@ -546,6 +381,7 @@ class _SettingsRow extends StatelessWidget {
     required this.detail,
     this.iconColor = const Color(0xFF2F7D80),
     this.iconBackgroundColor = const Color(0xFFF7F7F4),
+    this.onTap,
   });
 
   final IconData icon;
@@ -553,52 +389,57 @@ class _SettingsRow extends StatelessWidget {
   final String detail;
   final Color iconColor;
   final Color iconBackgroundColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          child: Row(
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: iconBackgroundColor,
-                  borderRadius: BorderRadius.circular(8),
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            child: Row(
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: iconBackgroundColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SizedBox.square(
+                    dimension: 44,
+                    child: Icon(icon, color: iconColor),
+                  ),
                 ),
-                child: SizedBox.square(
-                  dimension: 44,
-                  child: Icon(icon, color: iconColor),
-                ),
-              ),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                    Text(
-                      detail,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF6F6F69),
+                      Text(
+                        detail,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF6F6F69),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                if (onTap != null) const Icon(Icons.chevron_right),
+              ],
+            ),
           ),
-        ),
-        const Divider(height: 1),
-      ],
+          const Divider(height: 1),
+        ],
+      ),
     );
   }
 }

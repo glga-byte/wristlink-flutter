@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../devices/domain/device_directory.dart';
+import '../devices/presentation/device_presentation_models.dart';
+
 class SendScreen extends StatelessWidget {
-  const SendScreen({super.key});
+  const SendScreen({required this.deviceDirectory, super.key});
+
+  final DeviceDirectoryController deviceDirectory;
 
   static const _sendActions = <_SendActionData>[
     _SendActionData(
@@ -33,41 +38,53 @@ class SendScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    return AnimatedBuilder(
+      animation: deviceDirectory,
+      builder: (context, _) {
+        final textTheme = Theme.of(context).textTheme;
+        final readiness = mapShareConfirmReadiness(
+          deviceDirectory.resolveSendTarget(),
+        );
 
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-        children: [
-          Text(
-            'READY ON FORERUNNER 965',
-            style: textTheme.labelMedium?.copyWith(
-              color: const Color(0xFF2F7D80),
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0,
-            ),
+        return SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+            children: [
+              Text(
+                readiness.canSend
+                    ? 'READY ON ${readiness.foundWatchLabel.toUpperCase().replaceAll(' FOUND', '')}'
+                    : 'WATCH SETUP NEEDED',
+                style: textTheme.labelMedium?.copyWith(
+                  color: const Color(0xFF2F7D80),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Send to watch',
+                style: textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF111111),
+                ),
+              ),
+              const SizedBox(height: 24),
+              _SharePlaceCard(readiness: readiness),
+              const SizedBox(height: 24),
+              const Divider(height: 1),
+              for (final action in _sendActions) _SendActionRow(data: action),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Send to watch',
-            style: textTheme.displaySmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF111111),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const _SharePlaceCard(),
-          const SizedBox(height: 24),
-          const Divider(height: 1),
-          for (final action in _sendActions) _SendActionRow(data: action),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
 class _SharePlaceCard extends StatelessWidget {
-  const _SharePlaceCard();
+  const _SharePlaceCard({required this.readiness});
+
+  final ShareConfirmReadiness readiness;
 
   @override
   Widget build(BuildContext context) {
@@ -101,6 +118,20 @@ class _SharePlaceCard extends StatelessWidget {
                       color: const Color(0xFF111111),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  _ReadinessLine(
+                    icon: readiness.canSend
+                        ? Icons.check_circle_outline
+                        : Icons.error_outline,
+                    text: readiness.foundWatchLabel,
+                  ),
+                  const SizedBox(height: 6),
+                  _ReadinessLine(
+                    icon: readiness.canSend
+                        ? Icons.check_circle_outline
+                        : Icons.error_outline,
+                    text: readiness.companionInstalledLabel,
+                  ),
                 ],
               ),
             ),
@@ -125,6 +156,31 @@ class _SharePlaceCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ReadinessLine extends StatelessWidget {
+  const _ReadinessLine({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 17, color: const Color(0xFF111111)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
     );
   }
 }
