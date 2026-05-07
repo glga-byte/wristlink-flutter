@@ -1,7 +1,11 @@
+@TestOn('vm')
+library;
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wristlink_flutter/features/devices/data/method_channel_device_settings_store.dart';
 import 'package:wristlink_flutter/features/devices/domain/garmin_device.dart';
+import 'package:wristlink_flutter/features/devices/test_fixtures/device_fixtures.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +42,26 @@ void main() {
     expect(await store.readAuthorizedDevices(), isEmpty);
   });
 
+  test('reads and writes through the native channel', () async {
+    final store = MethodChannelDeviceSettingsStore(channel: channel);
+
+    await store.writeDefaultDeviceId(const GarminDeviceId('physical:default'));
+    await store.replaceAuthorizedDevices(const [fixtureReadyDevice]);
+
+    expect(
+      await store.readDefaultDeviceId(),
+      const GarminDeviceId('physical:default'),
+    );
+    final devices = await store.readAuthorizedDevices();
+
+    expect(devices, hasLength(1));
+    expect(devices.single.id, fixtureReadyDevice.id);
+    expect(devices.single.name, fixtureReadyDevice.name);
+    expect(devices.single.isDefault, isTrue);
+    expect(values['defaultDeviceId'], 'physical:default');
+    expect(values['authorizedDevices'], contains('fixture-ready'));
+  });
+
   test('skips stored devices with missing ids', () async {
     values['authorizedDevices'] =
         '[{"name":"Missing id"},{"id":"","name":"Empty id"},{"id":"physical:ok","name":"Forerunner","source":"physical","reachability":"reachable","companionInstallState":"installed"}]';
@@ -68,5 +92,26 @@ void main() {
       emulatorSettings.companionInstallState,
       CompanionInstallState.installed,
     );
+  });
+
+  test('surfaces missing plugin failures instead of falling back', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null);
+    final store = MethodChannelDeviceSettingsStore(channel: channel);
+
+    expect(store.readDefaultDeviceId(), throwsA(isA<MissingPluginException>()));
+  });
+
+  test('surfaces platform failures instead of falling back', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (_) async {
+          throw PlatformException(
+            code: 'storageFailure',
+            message: 'Storage failed.',
+          );
+        });
+    final store = MethodChannelDeviceSettingsStore(channel: channel);
+
+    expect(store.readAuthorizedDevices(), throwsA(isA<PlatformException>()));
   });
 }

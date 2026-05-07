@@ -2,40 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wristlink_flutter/app/wristlink_app.dart';
+import 'package:wristlink_flutter/features/devices/data/device_settings_store.dart';
+import 'package:wristlink_flutter/features/devices/data/in_memory_device_settings_store.dart';
+import 'package:wristlink_flutter/features/garmin_bridge/garmin_device_discovery_gateway.dart';
 
 void main() {
   const garminDevicesChannel = MethodChannel('wristlink/garmin_devices');
-  const deviceSettingsChannel = MethodChannel('wristlink/device_settings');
-  final settings = <String, String>{};
 
   setUp(() {
-    settings.clear();
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(deviceSettingsChannel, (call) async {
-          final arguments = call.arguments as Map<Object?, Object?>?;
-          final key = arguments?['key'] as String?;
-          switch (call.method) {
-            case 'readString':
-              return settings[key];
-            case 'writeString':
-              settings[key!] = arguments?['value'] as String;
-              return null;
-          }
-          return null;
-        });
+    TestWidgetsFlutterBinding.ensureInitialized();
   });
 
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(garminDevicesChannel, null);
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(deviceSettingsChannel, null);
   });
 
   testWidgets('renders the primary tab scaffold and initial Send destination', (
     tester,
   ) async {
-    await tester.pumpWidget(const WristLinkApp());
+    await tester.pumpWidget(_testApp());
 
     expect(find.text('Send'), findsOneWidget);
     expect(find.text('Queue'), findsOneWidget);
@@ -65,7 +51,7 @@ void main() {
   });
 
   testWidgets('switches between primary tab destinations', (tester) async {
-    await tester.pumpWidget(const WristLinkApp());
+    await tester.pumpWidget(_testApp());
 
     await tester.tap(find.text('Queue'));
     await tester.pumpAndSettle();
@@ -126,7 +112,9 @@ void main() {
           ];
         });
 
-    await tester.pumpWidget(const WristLinkApp());
+    await tester.pumpWidget(
+      _testApp(discoveryGateway: MethodChannelGarminDeviceDiscoveryGateway()),
+    );
 
     await tester.tap(find.text('Devices'));
     await tester.pumpAndSettle();
@@ -142,7 +130,7 @@ void main() {
   testWidgets('Developer Tools offline state appears on Devices tab', (
     tester,
   ) async {
-    await tester.pumpWidget(const WristLinkApp());
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Settings'));
@@ -167,4 +155,15 @@ void main() {
     expect(find.text('offline'), findsOneWidget);
     expect(find.text('connected'), findsNothing);
   });
+}
+
+Widget _testApp({
+  DeviceSettingsStore? deviceSettingsStore,
+  GarminDeviceDiscoveryGateway discoveryGateway =
+      const UnsupportedGarminDeviceDiscoveryGateway(),
+}) {
+  return WristLinkApp(
+    deviceSettingsStore: deviceSettingsStore ?? InMemoryDeviceSettingsStore(),
+    discoveryGateway: discoveryGateway,
+  );
 }

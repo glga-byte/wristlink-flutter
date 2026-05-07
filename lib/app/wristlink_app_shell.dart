@@ -2,15 +2,24 @@ import 'package:flutter/material.dart';
 
 import '../features/developer_tools/domain/emulator_device_controller.dart';
 import '../features/developer_tools/presentation/developer_tools_screen.dart';
+import '../features/devices/data/device_settings_store.dart';
 import '../features/devices/data/local_device_directory.dart';
-import '../features/devices/data/method_channel_device_settings_store.dart';
 import '../features/devices/domain/device_directory.dart';
 import '../features/devices/presentation/devices_screen.dart' as devices;
 import '../features/garmin_bridge/garmin_device_discovery_gateway.dart';
 import '../features/home/home_screen.dart';
+import 'platform/device_settings_store_provider.dart';
+import 'platform/garmin_device_discovery_gateway_provider.dart';
 
 class WristLinkAppShell extends StatefulWidget {
-  const WristLinkAppShell({super.key});
+  const WristLinkAppShell({
+    super.key,
+    this.deviceSettingsStore,
+    this.discoveryGateway,
+  });
+
+  final DeviceSettingsStore? deviceSettingsStore;
+  final GarminDeviceDiscoveryGateway? discoveryGateway;
 
   @override
   State<WristLinkAppShell> createState() => _WristLinkAppShellState();
@@ -24,8 +33,9 @@ class _WristLinkAppShellState extends State<WristLinkAppShell> {
   void initState() {
     super.initState();
     _deviceDirectory = LocalDeviceDirectory(
-      store: MethodChannelDeviceSettingsStore(),
-      discoveryGateway: MethodChannelGarminDeviceDiscoveryGateway(),
+      store: widget.deviceSettingsStore ?? createDeviceSettingsStore(),
+      discoveryGateway:
+          widget.discoveryGateway ?? createGarminDeviceDiscoveryGateway(),
     )..load();
   }
 
