@@ -45,4 +45,5 @@ flutter {
 
 dependencies {
     implementation("com.garmin.connectiq:ciq-companion-app-sdk:2.4.0@aar")
+    testImplementation("junit:junit:4.13.2")
 }

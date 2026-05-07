@@ -3,6 +3,7 @@ package com.wristlink.wristlink_flutter
 import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import com.garmin.android.connectiq.ConnectIQ
 import com.garmin.android.connectiq.IQApp
 import com.garmin.android.connectiq.IQDevice
@@ -192,18 +193,29 @@ class MainActivity : FlutterActivity() {
 
             val appId = connectIqAppId()
             if (appId == null) {
+                val latestStates = GarminBridgeMapping.completeCompanionStates(
+                    knownDevices.map { it.deviceIdentifier },
+                    emptyMap(),
+                )
+                replaceCompanionStates(latestStates)
                 result.success(knownDevices.map { device ->
                     registerForDeviceEvents(connectIq, device)
-                    mapDevice(connectIq, device, "unknown")
+                    mapDevice(
+                        connectIq,
+                        device,
+                        latestStates[device.deviceIdentifier]
+                            ?: GarminBridgeMapping.UNKNOWN_COMPANION_STATE,
+                    )
                 })
                 return
             }
 
             queryCompanionStates(connectIq, knownDevices, appId, result)
         } catch (error: Throwable) {
+            Log.w(TAG, "Garmin device discovery failed.", error)
             result.error(
                 "nativeFailure",
-                error.message ?: "Garmin device discovery failed.",
+                GarminBridgeMapping.NATIVE_DISCOVERY_FAILURE_MESSAGE,
                 null,
             )
         }
@@ -222,10 +234,19 @@ class MainActivity : FlutterActivity() {
         fun finish() {
             if (finished) return
             finished = true
-            companionStates.putAll(states)
+            val latestStates = GarminBridgeMapping.completeCompanionStates(
+                devices.map { it.deviceIdentifier },
+                states,
+            )
+            replaceCompanionStates(latestStates)
             result.success(devices.map { device ->
                 registerForDeviceEvents(connectIq, device)
-                mapDevice(connectIq, device, states[device.deviceIdentifier] ?: "unknown")
+                mapDevice(
+                    connectIq,
+                    device,
+                    latestStates[device.deviceIdentifier]
+                        ?: GarminBridgeMapping.UNKNOWN_COMPANION_STATE,
+                )
             })
         }
 
@@ -239,7 +260,8 @@ class MainActivity : FlutterActivity() {
                     device,
                     object : ConnectIQ.IQApplicationInfoListener {
                         override fun onApplicationInfoReceived(app: IQApp) {
-                            states[device.deviceIdentifier] = mapCompanionStatus(app.status?.name)
+                            states[device.deviceIdentifier] =
+                                GarminBridgeMapping.mapCompanionStatus(app.status?.name)
                             remaining -= 1
                             if (remaining == 0) {
                                 mainHandler.removeCallbacks(timeout)
@@ -258,7 +280,7 @@ class MainActivity : FlutterActivity() {
                     },
                 )
             } catch (_: Throwable) {
-                states[device.deviceIdentifier] = "unknown"
+                states[device.deviceIdentifier] = GarminBridgeMapping.UNKNOWN_COMPANION_STATE
                 remaining -= 1
                 if (remaining == 0) {
                     mainHandler.removeCallbacks(timeout)
@@ -290,7 +312,7 @@ class MainActivity : FlutterActivity() {
             "name" to device.friendlyName,
             "modelName" to partNumber,
             "unitId" to device.deviceIdentifier.toString(),
-            "reachability" to mapReachability(status),
+            "reachability" to GarminBridgeMapping.mapReachability(status),
             "companionInstallState" to companionInstallState,
         )
     }
@@ -320,7 +342,9 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun emitDeviceUpdate(connectIq: ConnectIQ, device: IQDevice, status: String) {
-        val companionInstallState = companionStates[device.deviceIdentifier] ?: "unknown"
+        val companionInstallState =
+            companionStates[device.deviceIdentifier]
+                ?: GarminBridgeMapping.UNKNOWN_COMPANION_STATE
         deviceEventSink?.success(
             mapDevice(
                 connectIq,
@@ -331,23 +355,9 @@ class MainActivity : FlutterActivity() {
         )
     }
 
-    private fun mapReachability(status: String?): String {
-        val normalized = status?.lowercase().orEmpty()
-        return when {
-            "not_connected" in normalized || "not_paired" in normalized -> "offline"
-            "connected" in normalized -> "reachable"
-            normalized.isEmpty() || "unknown" in normalized -> "unknown"
-            else -> "nearby"
-        }
-    }
-
-    private fun mapCompanionStatus(status: String?): String {
-        val normalized = status?.lowercase()?.substringAfterLast('.').orEmpty()
-        return when {
-            normalized == "not_installed" || normalized == "not_supported" -> "missing"
-            normalized == "installed" -> "installed"
-            else -> "unknown"
-        }
+    private fun replaceCompanionStates(latestStates: Map<Long, String>) {
+        companionStates.keys.retainAll(latestStates.keys)
+        companionStates.putAll(latestStates)
     }
 
     private fun connectIqAppId(): String? {
@@ -379,6 +389,7 @@ class MainActivity : FlutterActivity() {
         const val DEVICE_SETTINGS_NAME = "wristlink_device_settings"
         const val GARMIN_CONNECT_PACKAGE = "com.garmin.android.apps.connectmobile"
         const val GARMIN_CONNECT_IQ_PACKAGE = "com.garmin.connectiq"
+        const val TAG = "WristLinkGarminBridge"
         const val CONNECT_IQ_APP_ID_META_DATA = "com.wristlink.CONNECT_IQ_APP_ID"
         const val CONNECT_IQ_APP_ID_PLACEHOLDER = "00000000-0000-0000-0000-000000000000"
         const val COMPANION_STATUS_TIMEOUT_MS = 3000L
