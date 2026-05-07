@@ -57,6 +57,16 @@ integration_test/      # Integration scenarios when needed
 - Do not add Connect IQ watch app logic to this repository.
 - When a feature introduces durable project knowledge, architecture rules, platform constraints, verification steps, or conventions that future agents must follow, update `AGENTS.md` as part of the same change.
 
+## Local Tooling
+
+- Android Gradle/Kotlin commands must run with a supported JDK such as JDK 17 or JDK 21. Do not use Java 26+ for direct `./gradlew` commands; Kotlin Gradle script initialization can fail before tasks start.
+- Flutter commands normally use the JDK bundled with Android Studio, as reported by `flutter doctor -v`.
+- Do not change global `JAVA_HOME` just to run project checks. If a direct `./gradlew` command picks up an unsupported system JDK, prefix that command with Android Studio's bundled JDK for this invocation only:
+
+```sh
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
+```
+
 ## Verification
 
 Run these checks before handing off changes:
@@ -66,6 +76,7 @@ dart format .
 flutter analyze
 flutter test
 # When native SDK bridge changes are included:
+cd android && JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
 flutter build apk --debug
 flutter build ios --no-codesign
 ```
