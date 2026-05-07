@@ -220,8 +220,7 @@ final class GarminDeviceBridge: NSObject, IQUIOverrideDelegate, IQDeviceEventDel
     for device in devices {
       let app = IQApp(uuid: appId, store: appId, device: device)
       ConnectIQ.sharedInstance().getAppStatus(app) { status in
-        states[device.uuid] = status?.isInstalled == true ? "installed" : "missing"
-        self.latestCompanionStates[device.uuid] = states[device.uuid]
+        states[device.uuid] = self.mapCompanionInstallState(status)
         remaining -= 1
         if remaining == 0 {
           finish()
@@ -263,7 +262,7 @@ final class GarminDeviceBridge: NSObject, IQUIOverrideDelegate, IQDeviceEventDel
     let app = IQApp(uuid: appId, store: appId, device: device)
     ConnectIQ.sharedInstance().getAppStatus(app) { [weak self] appStatus in
       guard let self else { return }
-      let companionState = appStatus?.isInstalled == true ? "installed" : "missing"
+      let companionState = self.mapCompanionInstallState(appStatus)
       self.latestCompanionStates[device.uuid] = companionState
       eventSink(
         self.mapDevice(
@@ -273,6 +272,11 @@ final class GarminDeviceBridge: NSObject, IQUIOverrideDelegate, IQDeviceEventDel
         )
       )
     }
+  }
+
+  private func mapCompanionInstallState(_ status: IQAppStatus?) -> String {
+    guard let status else { return "unknown" }
+    return status.isInstalled ? "installed" : "missing"
   }
 
   private func mapReachability(_ status: IQDeviceStatus) -> String {
