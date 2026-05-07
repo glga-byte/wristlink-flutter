@@ -239,7 +239,7 @@ class MainActivity : FlutterActivity() {
                     device,
                     object : ConnectIQ.IQApplicationInfoListener {
                         override fun onApplicationInfoReceived(app: IQApp) {
-                            states[device.deviceIdentifier] = mapCompanionStatus(app.status?.toString())
+                            states[device.deviceIdentifier] = mapCompanionStatus(app.status?.name)
                             remaining -= 1
                             if (remaining == 0) {
                                 mainHandler.removeCallbacks(timeout)
@@ -342,10 +342,10 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun mapCompanionStatus(status: String?): String {
-        val normalized = status?.lowercase().orEmpty()
+        val normalized = status?.lowercase()?.substringAfterLast('.').orEmpty()
         return when {
-            "installed" in normalized -> "installed"
-            "not_installed" in normalized || "not_supported" in normalized -> "missing"
+            normalized == "not_installed" || normalized == "not_supported" -> "missing"
+            normalized == "installed" -> "installed"
             else -> "unknown"
         }
     }
