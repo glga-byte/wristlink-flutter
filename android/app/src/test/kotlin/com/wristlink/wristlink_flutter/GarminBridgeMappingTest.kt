@@ -58,6 +58,45 @@ class GarminBridgeMappingTest {
     }
 
     @Test
+    fun buildsDevicePayloadWithSharedMetadataKeys() {
+        val payload = GarminBridgeMapping.devicePayload(
+            id = "123",
+            name = "Forerunner",
+            modelName = "Forerunner 965",
+            family = "006-B1234-00",
+            unitId = "123",
+            nativeStatus = "CONNECTED",
+            companionInstallState = "installed",
+        )
+
+        assertEquals("123", payload["id"])
+        assertEquals("Forerunner", payload["name"])
+        assertEquals("Forerunner 965", payload["modelName"])
+        assertEquals("006-B1234-00", payload["family"])
+        assertEquals("123", payload["unitId"])
+        assertEquals("reachable", payload["reachability"])
+        assertEquals("installed", payload["companionInstallState"])
+    }
+
+    @Test
+    fun buildsDevicePayloadWithStableFallbackName() {
+        val payload = GarminBridgeMapping.devicePayload(
+            id = "123",
+            name = " ",
+            modelName = null,
+            family = null,
+            unitId = "123",
+            nativeStatus = "UNKNOWN",
+            companionInstallState = "unknown",
+        )
+
+        assertEquals("Garmin device", payload["name"])
+        assertEquals(null, payload["modelName"])
+        assertEquals(null, payload["family"])
+        assertEquals("unknown", payload["reachability"])
+    }
+
+    @Test
     fun exposesStableNativeDiscoveryFailureMessage() {
         assertEquals(
             "Garmin device discovery failed.",
