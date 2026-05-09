@@ -25,6 +25,7 @@ internal class GarminDeviceBridge(
     private val registeredDeviceEventIds = mutableSetOf<Long>()
     private var deviceEventSink: EventChannel.EventSink? = null
     private var sdkInitTimeout: Runnable? = null
+    private var sdkInitCompletion: BridgeCompletion? = null
 
     fun register(binaryMessenger: BinaryMessenger) {
         MethodChannel(binaryMessenger, GARMIN_DEVICE_CHANNEL).setMethodCallHandler { call, result ->
@@ -84,6 +85,7 @@ internal class GarminDeviceBridge(
         sdkInitializing = true
         sdkInitRequestId += 1
         val requestId = sdkInitRequestId
+        sdkInitCompletion = BridgeCompletion(requestId)
 
         val timeout = Runnable {
             completeSdkInitialization(requestId, ready = false) { pendingResult ->
@@ -132,6 +134,7 @@ internal class GarminDeviceBridge(
                     sdkReady = false
                     sdkInitializing = false
                     sdkInitRequestId += 1
+                    sdkInitCompletion = null
                     connectIq = null
                     registeredDeviceEventIds.clear()
                 }
@@ -144,17 +147,19 @@ internal class GarminDeviceBridge(
         ready: Boolean,
         complete: (MethodChannel.Result) -> Unit,
     ): List<MethodChannel.Result> {
-        if (sdkInitRequestId != requestId) {
-            return emptyList()
+        val sdkCompletion = sdkInitCompletion ?: return emptyList()
+        var pendingResults = emptyList<MethodChannel.Result>()
+        val completed = sdkCompletion.run(requestId) {
+            sdkInitCompletion = null
+            sdkInitRequestId += 1
+            sdkInitTimeout?.let { mainHandler.removeCallbacks(it) }
+            sdkInitTimeout = null
+            sdkInitializing = false
+            sdkReady = ready
+            pendingResults = drainPendingDiscoveryResults()
+            pendingResults.forEach(complete)
         }
-        sdkInitRequestId += 1
-        sdkInitTimeout?.let { mainHandler.removeCallbacks(it) }
-        sdkInitTimeout = null
-        sdkInitializing = false
-        sdkReady = ready
-        val pendingResults = drainPendingDiscoveryResults()
-        pendingResults.forEach(complete)
-        return pendingResults
+        return if (completed) pendingResults else emptyList()
     }
 
     private fun drainPendingDiscoveryResults(): List<MethodChannel.Result> {
@@ -213,31 +218,31 @@ internal class GarminDeviceBridge(
     ) {
         val states = mutableMapOf<Long, String>()
         var remaining = devices.size
-        var finished = false
+        val completion = BridgeCompletion()
 
         fun finish() {
-            if (finished) return
-            finished = true
-            val latestStates = GarminBridgeMapping.completeCompanionStates(
-                devices.map { it.deviceIdentifier },
-                states,
-            )
-            replaceCompanionStates(latestStates)
-            result.success(devices.map { device ->
-                registerForDeviceEvents(connectIq, device)
-                mapDevice(
-                    connectIq,
-                    device,
-                    latestStates[device.deviceIdentifier]
-                        ?: GarminBridgeMapping.UNKNOWN_COMPANION_STATE,
+            completion.run {
+                val latestStates = GarminBridgeMapping.completeCompanionStates(
+                    devices.map { it.deviceIdentifier },
+                    states,
                 )
-            })
+                replaceCompanionStates(latestStates)
+                result.success(devices.map { device ->
+                    registerForDeviceEvents(connectIq, device)
+                    mapDevice(
+                        connectIq,
+                        device,
+                        latestStates[device.deviceIdentifier]
+                            ?: GarminBridgeMapping.UNKNOWN_COMPANION_STATE,
+                    )
+                })
+            }
         }
 
         lateinit var timeout: Runnable
 
         fun recordState(device: IQDevice, companionState: String) {
-            if (finished) return
+            if (completion.isCompleted) return
             states[device.deviceIdentifier] = companionState
             remaining -= 1
             if (remaining == 0) {
