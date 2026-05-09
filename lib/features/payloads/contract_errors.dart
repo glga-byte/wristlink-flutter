@@ -15,3 +15,18 @@ class ContractError implements Exception {
   @override
   String toString() => 'ContractError($code, $message)';
 }
+
+void validateAllowedKeys(
+  Map<String, Object?> json,
+  Set<String> allowedKeys,
+  String objectName,
+) {
+  for (final key in json.keys) {
+    if (!allowedKeys.contains(key)) {
+      throw ContractError(
+        ContractErrorCode.malformedPayload,
+        '$objectName contains unsupported field: $key.',
+      );
+    }
+  }
+}

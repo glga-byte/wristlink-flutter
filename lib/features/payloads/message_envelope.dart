@@ -19,6 +19,15 @@ class MessageEnvelope {
   });
 
   factory MessageEnvelope.fromJson(Map<String, Object?> json) {
+    validateAllowedKeys(json, const <String>{
+      'v',
+      'id',
+      'kind',
+      'createdAt',
+      'ttlSec',
+      'payload',
+    }, 'Message envelope');
+
     final version = json['v'];
     if (version != contractProtocolVersion) {
       throw ContractError(

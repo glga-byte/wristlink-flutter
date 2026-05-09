@@ -111,6 +111,31 @@ void main() {
       );
     });
 
+    test('unknown message and payload fields are rejected', () {
+      final note = _readJson(
+        File('contract/fixtures/v1/messages/valid/note.json'),
+      );
+
+      _expectMalformedPayload(
+        () =>
+            MessageEnvelope.fromJson(<String, Object?>{...note, 'extra': true}),
+      );
+
+      for (final fixture in _fixtureFiles(
+        'contract/fixtures/v1/messages/valid',
+      )) {
+        final json = _readJson(fixture);
+        final payload = (json['payload']! as Map).cast<String, Object?>();
+
+        _expectMalformedPayload(
+          () => MessageEnvelope.fromJson(<String, Object?>{
+            ...json,
+            'payload': <String, Object?>{...payload, 'extra': true},
+          }),
+        );
+      }
+    });
+
     test('ULID validation and v1 serialized size budget are enforced', () {
       expect(
         () => validateUlid('not-a-ulid'),
@@ -222,12 +247,29 @@ void main() {
       );
     });
 
-    test('contract metadata matches Dart size budget', () {
+    test('contract metadata matches Dart size budget and message kinds', () {
       final metadata = _readJson(File('contract/protocol/v1/metadata.json'));
       expect(
         metadata['serializedMessageBudgetBytes'],
         v1SerializedMessageBudgetBytes,
       );
+
+      final metadataKinds = (metadata['messageKinds']! as Map)
+          .cast<String, Object?>();
+      final dartKinds = <String, bool>{
+        for (final kind in MessageKind.values)
+          kind.wireName: kind.requiresAcknowledgement,
+      };
+
+      expect(metadataKinds.keys.toSet(), dartKinds.keys.toSet());
+      for (final entry in metadataKinds.entries) {
+        final metadataKind = (entry.value! as Map).cast<String, Object?>();
+        expect(
+          metadataKind['requiresAcknowledgement'],
+          dartKinds[entry.key],
+          reason: entry.key,
+        );
+      }
     });
   });
 
@@ -274,6 +316,19 @@ void main() {
         ),
       );
     });
+
+    test('unknown acknowledgement fields are rejected', () {
+      final acknowledgement = _readJson(
+        File('contract/fixtures/v1/acknowledgements/accepted.json'),
+      );
+
+      _expectMalformedPayload(
+        () => WatchAcknowledgement.fromJson(<String, Object?>{
+          ...acknowledgement,
+          'extra': true,
+        }),
+      );
+    });
   });
 }
 
@@ -289,6 +344,19 @@ List<File> _fixtureFiles(String path) {
 Map<String, Object?> _readJson(File file) {
   final decoded = jsonDecode(file.readAsStringSync());
   return (decoded as Map).cast<String, Object?>();
+}
+
+void _expectMalformedPayload(Object? Function() callback) {
+  expect(
+    callback,
+    throwsA(
+      isA<ContractError>().having(
+        (error) => error.code,
+        'code',
+        ContractErrorCode.malformedPayload,
+      ),
+    ),
+  );
 }
 
 MessageEnvelope _message({

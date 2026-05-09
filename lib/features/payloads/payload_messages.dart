@@ -49,6 +49,13 @@ class PointPayload implements ContractPayload {
   });
 
   factory PointPayload.fromJson(Map<String, Object?> json) {
+    validateAllowedKeys(json, const <String>{
+      'label',
+      'lat',
+      'lon',
+      'note',
+    }, 'Point payload');
+
     final latitude = _number(json['lat'], 'lat');
     final longitude = _number(json['lon'], 'lon');
     if (latitude < -90 || latitude > 90) {
@@ -115,6 +122,11 @@ class TimerPayload implements ContractPayload {
   const TimerPayload({required this.label, required this.duration});
 
   factory TimerPayload.fromJson(Map<String, Object?> json) {
+    validateAllowedKeys(json, const <String>{
+      'label',
+      'durationSec',
+    }, 'Timer payload');
+
     final durationSec = _int(json['durationSec'], 'durationSec');
     if (durationSec < 1) {
       throw const ContractError(
@@ -157,6 +169,8 @@ class NotePayload implements ContractPayload {
   const NotePayload({required this.body, this.title});
 
   factory NotePayload.fromJson(Map<String, Object?> json) {
+    validateAllowedKeys(json, const <String>{'title', 'body'}, 'Note payload');
+
     return NotePayload(
       title: _optionalString(json['title'], 'title'),
       body: _requiredString(json['body'], 'body'),
@@ -188,6 +202,11 @@ class CommandPayload implements ContractPayload {
   });
 
   factory CommandPayload.fromJson(Map<String, Object?> json) {
+    validateAllowedKeys(json, const <String>{
+      'name',
+      'args',
+    }, 'Command payload');
+
     final rawArgs = json['args'];
     return CommandPayload(
       name: _requiredString(json['name'], 'name'),

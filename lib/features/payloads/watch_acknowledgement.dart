@@ -46,6 +46,16 @@ class WatchAcknowledgement {
   });
 
   factory WatchAcknowledgement.fromJson(Map<String, Object?> json) {
+    validateAllowedKeys(json, const <String>{
+      'v',
+      'id',
+      'kind',
+      'ackFor',
+      'status',
+      'receivedAt',
+      'reason',
+    }, 'Watch acknowledgement');
+
     final version = json['v'];
     if (version != contractProtocolVersion) {
       throw ContractError(
