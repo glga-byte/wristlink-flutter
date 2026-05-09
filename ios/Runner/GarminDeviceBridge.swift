@@ -63,7 +63,7 @@ final class GarminDeviceBridge: NSObject, IQUIOverrideDelegate, IQDeviceEventDel
     pendingRequest = request
     ConnectIQ.sharedInstance().showDeviceSelection()
     DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self, requestId = request.id] in
-      self?.completePendingRequest(requestId: requestId) { pendingResult in
+      self?.completePendingAuthorizationRequest(requestId: requestId) { pendingResult in
         pendingResult(
           FlutterError(
             code: "timeout",
@@ -115,6 +115,9 @@ final class GarminDeviceBridge: NSObject, IQUIOverrideDelegate, IQDeviceEventDel
         self.latestDevices[device.uuid] = device
         ConnectIQ.sharedInstance().register(forDeviceEvents: device, delegate: self)
       }
+      guard self.markAuthorizationComplete(requestId: requestId) else {
+        return
+      }
       self.mapDevicesWithCompanionState(devices, requestId: requestId)
     }
     return true
@@ -129,6 +132,28 @@ final class GarminDeviceBridge: NSObject, IQUIOverrideDelegate, IQDeviceEventDel
       self?.pendingRequest = nil
       completion(request.result)
     }
+  }
+
+  private func completePendingAuthorizationRequest(
+    requestId: UUID,
+    completion: @escaping (FlutterResult) -> Void
+  ) {
+    guard
+      let request = pendingRequest,
+      request.id == requestId,
+      request.isAuthorizationPending
+    else {
+      return
+    }
+    request.completion.run { [weak self] in
+      self?.pendingRequest = nil
+      completion(request.result)
+    }
+  }
+
+  private func markAuthorizationComplete(requestId: UUID) -> Bool {
+    guard let request = pendingRequest, request.id == requestId else { return false }
+    return request.markAuthorizationComplete()
   }
 
   private func isCancellationCallback(_ url: URL) -> Bool {
@@ -318,8 +343,19 @@ private final class DiscoveryRequest {
   let id = UUID()
   let result: FlutterResult
   let completion = OneShotCompletion()
+  private var authorizationPending = true
+
+  var isAuthorizationPending: Bool {
+    authorizationPending
+  }
 
   init(result: @escaping FlutterResult) {
     self.result = result
+  }
+
+  func markAuthorizationComplete() -> Bool {
+    guard authorizationPending else { return false }
+    authorizationPending = false
+    return true
   }
 }
