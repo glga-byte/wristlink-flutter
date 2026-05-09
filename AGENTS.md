@@ -56,6 +56,16 @@ integration_test/      # Integration scenarios when needed
 - Use WorkManager for background sending only through a dedicated bridge/service layer.
 - Cover payload serialization, queue behavior, and bridge error handling with tests.
 - Do not add Connect IQ watch app logic to this repository.
+- Before changing message payloads, acknowledgements, contract schemas,
+  fixtures, send queue contract handling, or Garmin transport mapping, read
+  `contract/AGENTS.md`.
+- When this repo adopts a changed message contract, update the `contract/`
+  submodule pointer and document the adopted revision in the change's
+  implementation notes or PR description.
+- Native Android/iOS Garmin send adapters must stay transport-oriented: accept
+  already-normalized contract maps from Dart and map Garmin SDK transport
+  failures, including too-large app-message payloads, to typed Dart domain
+  errors. Do not add payload business rules in native bridge code.
 - When a feature introduces durable project knowledge, architecture rules, platform constraints, verification steps, or conventions that future agents must follow, update `AGENTS.md` as part of the same change.
 
 ## Local Tooling
@@ -76,6 +86,8 @@ Run these checks before handing off changes:
 dart format .
 flutter analyze
 flutter test
+# When message contract assets or Dart contract models change:
+flutter test test/features/payloads
 # When native SDK bridge changes are included:
 cd android && JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
 flutter build apk --debug

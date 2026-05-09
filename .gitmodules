@@ -1,0 +1,4 @@
+[submodule "contract"]
+	path = contract
+	url = https://github.com/glga-byte/wristlink-contract.git
+	branch = main
