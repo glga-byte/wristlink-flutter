@@ -56,23 +56,12 @@ integration_test/      # Integration scenarios when needed
 - Use WorkManager for background sending only through a dedicated bridge/service layer.
 - Cover payload serialization, queue behavior, and bridge error handling with tests.
 - Do not add Connect IQ watch app logic to this repository.
-- Treat `contract/` as the read-only source of truth for WristLink
-  phone-to-watch message envelopes, payload kinds, watch acknowledgements,
-  schemas, metadata, and fixtures shared with the separate Connect IQ
-  repository. Flutter code may consume these assets but must not redefine
-  incompatible local message shapes.
-- When adopting a changed message contract, update the `contract/` submodule
-  pointer in the parent repo and document the adopted revision in the change's
+- Before changing message payloads, acknowledgements, contract schemas,
+  fixtures, send queue contract handling, or Garmin transport mapping, read
+  `contract/AGENTS.md`.
+- When this repo adopts a changed message contract, update the `contract/`
+  submodule pointer and document the adopted revision in the change's
   implementation notes or PR description.
-- WristLink message contract v1 uses compact JSON envelopes with protocol
-  version `1`, a 26-character ULID id, kind, UTC creation timestamp, optional
-  TTL seconds, and kind-specific payload data. Enforce the shared v1 serialized
-  envelope budget of 1024 UTF-8 JSON bytes before queueing or invoking native
-  Garmin transport.
-- Watch acknowledgements must be parsed through shared contract models and
-  matched by original message id. Only message kinds whose contract metadata
-  requires acknowledgement should wait for accepted/rejected/unsupported/
-  retryable watch responses before final queue status transitions.
 - Native Android/iOS Garmin send adapters must stay transport-oriented: accept
   already-normalized contract maps from Dart and map Garmin SDK transport
   failures, including too-large app-message payloads, to typed Dart domain
