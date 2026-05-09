@@ -1,19 +1,4 @@
-## Purpose
-
-Define typed Garmin Connect IQ Mobile SDK discovery behavior and platform adapter outcomes used by the shared device directory.
-
-## Requirements
-
-### Requirement: Typed Garmin Discovery Gateway
-The system SHALL wrap platform Garmin Connect IQ Mobile SDK behavior in a typed Dart gateway rather than exposing raw Platform Channel payloads to UI code.
-
-#### Scenario: Discovery gateway returns devices
-- **WHEN** a platform adapter reports Garmin devices
-- **THEN** the gateway maps them into shared Dart device models and domain states
-
-#### Scenario: Discovery gateway reports error
-- **WHEN** a platform adapter cannot complete discovery
-- **THEN** the gateway returns a typed domain error such as SDK unavailable, Garmin Connect missing, authorization cancelled, no authorized devices, timeout, or unsupported platform
+## ADDED Requirements
 
 ### Requirement: Native Garmin Bridge Boundaries
 The system SHALL keep native Garmin discovery bridge responsibilities in focused adapter, mapping, event, and settings components rather than concentrating them in platform app entry files.
@@ -25,6 +10,8 @@ The system SHALL keep native Garmin discovery bridge responsibilities in focused
 #### Scenario: Native mapping is tested independently
 - **WHEN** native Garmin status or payload mapping behavior changes
 - **THEN** the system verifies the mapping through native unit tests without requiring a live Garmin SDK session
+
+## MODIFIED Requirements
 
 ### Requirement: Android SDK Device Discovery
 The system SHALL provide an Android native adapter for Garmin Connect IQ Mobile SDK device discovery, status, companion app install state, and normalized Garmin device payloads.
@@ -60,17 +47,6 @@ The system SHALL provide an iOS native adapter for Garmin Connect IQ Mobile SDK 
 - **WHEN** iOS Garmin SDK callbacks resolve companion state, status events, authorization callback, or timeout completion
 - **THEN** the system mutates bridge state and completes Flutter method or event results from the main queue through an idempotent completion path
 
-### Requirement: Authorized Device Cache
-The system SHALL persist only the latest authorized native device list and normalized metadata needed by the Dart device directory.
-
-#### Scenario: Latest authorization replaces cache
-- **WHEN** a native adapter returns a new authorized device list
-- **THEN** the system replaces previously cached native devices with the latest authorized devices
-
-#### Scenario: App restarts after authorization
-- **WHEN** the app restarts after devices were authorized
-- **THEN** the system restores normalized cached devices for display until the user refreshes or native status updates arrive
-
 ### Requirement: Native Status and Companion Mapping
 The system SHALL map native SDK device connection status, Connect IQ app install status, and Garmin device metadata into shared reachability, companion install, and payload fields consistently across Android and iOS.
 
@@ -85,10 +61,3 @@ The system SHALL map native SDK device connection status, Connect IQ app install
 #### Scenario: Native payload metadata is emitted
 - **WHEN** Android or iOS native discovery returns a Garmin device or emits a status event
 - **THEN** the payload includes equivalent `id`, `name`, `modelName`, `family`, `unitId`, `reachability`, and `companionInstallState` fields where the Garmin SDK provides those values
-
-### Requirement: Platform Unsupported Behavior
-The system SHALL handle platforms without a Garmin discovery adapter without crashing.
-
-#### Scenario: Unsupported platform requests discovery
-- **WHEN** the device directory refreshes on a platform without a native Garmin adapter
-- **THEN** the system returns an unsupported platform domain error that UI can present or ignore

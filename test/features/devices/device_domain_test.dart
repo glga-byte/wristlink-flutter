@@ -46,10 +46,13 @@ void main() {
         'reachability': 'connected',
         'companionInstallState': 'installed',
         'modelName': 'Forerunner 965',
+        'family': '006-B1234-00',
       },
     ]);
 
     expect(devices.single.id, const GarminDeviceId('physical:123'));
+    expect(devices.single.metadata.modelName, 'Forerunner 965');
+    expect(devices.single.metadata.family, '006-B1234-00');
     expect(devices.single.reachability, DeviceReachability.reachable);
     expect(
       devices.single.companionInstallState,
