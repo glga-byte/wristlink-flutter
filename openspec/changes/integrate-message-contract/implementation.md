@@ -1,7 +1,7 @@
 ## Implementation Notes
 
 - Adopted contract submodule revision:
-  `679dcccd3468066beef46823791577c38536caa5`.
+  `d9c696bb85384fa82b8e9a4dfee361ad4be1c05a`.
 - The parent Flutter repository pins `contract/` to that revision for the v1
   phone-to-watch message envelope, acknowledgement schema, metadata, and
   fixtures, plus shared agent guidance for Flutter and Connect IQ consuming
