@@ -53,7 +53,7 @@ class MethodChannelGarminSendGateway implements GarminSendGateway {
     required GarminDeviceId deviceId,
     required MessageEnvelope message,
   }) async {
-    message.validateSize();
+    message.validate();
 
     try {
       await _channel.invokeMethod<Object?>('sendMessage', <String, Object?>{

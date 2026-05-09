@@ -36,6 +36,29 @@ void main() {
     expect(record.status, SendQueueStatus.sent);
   });
 
+  test('pending records reject invalid contract messages', () {
+    final now = DateTime.utc(2026, 5, 9, 12);
+
+    expect(
+      () => SendQueueRecord.pending(
+        message: MessageEnvelope(
+          id: 'not-a-ulid',
+          kind: MessageKind.note,
+          createdAt: now,
+          payload: const NotePayload(body: 'Hello'),
+        ),
+        createdAt: now,
+      ),
+      throwsA(
+        isA<ContractError>().having(
+          (error) => error.code,
+          'code',
+          ContractErrorCode.malformedPayload,
+        ),
+      ),
+    );
+  });
+
   test('acknowledgements transition required-ack messages', () {
     final now = DateTime.utc(2026, 5, 9, 12);
     final sending = SendQueueRecord.pending(

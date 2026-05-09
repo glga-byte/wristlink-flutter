@@ -35,6 +35,8 @@ enum MessageKind {
 abstract interface class ContractPayload {
   MessageKind get kind;
 
+  void validate();
+
   Map<String, Object?> toJson();
 }
 
@@ -79,6 +81,26 @@ class PointPayload implements ContractPayload {
   final String? note;
 
   @override
+  void validate() {
+    _validateNumber(latitude, 'lat');
+    _validateNumber(longitude, 'lon');
+    if (latitude < -90 || latitude > 90) {
+      throw const ContractError(
+        ContractErrorCode.malformedPayload,
+        'Point latitude must be between -90 and 90.',
+      );
+    }
+    if (longitude < -180 || longitude > 180) {
+      throw const ContractError(
+        ContractErrorCode.malformedPayload,
+        'Point longitude must be between -180 and 180.',
+      );
+    }
+    _optionalString(label, 'label');
+    _optionalString(note, 'note');
+  }
+
+  @override
   Map<String, Object?> toJson() {
     return <String, Object?>{
       if (label != null) 'label': label,
@@ -114,6 +136,18 @@ class TimerPayload implements ContractPayload {
   final Duration duration;
 
   @override
+  void validate() {
+    _requiredString(label, 'label');
+    if (duration.inSeconds < 1 ||
+        duration.inMicroseconds % Duration.microsecondsPerSecond != 0) {
+      throw const ContractError(
+        ContractErrorCode.malformedPayload,
+        'Timer durationSec must be a positive whole-second duration.',
+      );
+    }
+  }
+
+  @override
   Map<String, Object?> toJson() {
     return <String, Object?>{'label': label, 'durationSec': duration.inSeconds};
   }
@@ -134,6 +168,12 @@ class NotePayload implements ContractPayload {
 
   final String body;
   final String? title;
+
+  @override
+  void validate() {
+    _optionalString(title, 'title');
+    _requiredString(body, 'body');
+  }
 
   @override
   Map<String, Object?> toJson() {
@@ -160,6 +200,12 @@ class CommandPayload implements ContractPayload {
 
   final String name;
   final Map<String, Object?> args;
+
+  @override
+  void validate() {
+    _requiredString(name, 'name');
+    _validateJsonValue(args, 'args');
+  }
 
   @override
   Map<String, Object?> toJson() {
@@ -205,13 +251,22 @@ int _int(Object? value, String field) {
 }
 
 double _number(Object? value, String field) {
-  if (value is num) {
+  if (value is num && value.isFinite) {
     return value.toDouble();
   }
   throw ContractError(
     ContractErrorCode.malformedPayload,
     '$field must be a number.',
   );
+}
+
+void _validateNumber(num value, String field) {
+  if (!value.isFinite) {
+    throw ContractError(
+      ContractErrorCode.malformedPayload,
+      '$field must be a finite number.',
+    );
+  }
 }
 
 Map<String, Object?> _map(Object? value, String field) {
@@ -221,5 +276,31 @@ Map<String, Object?> _map(Object? value, String field) {
   throw ContractError(
     ContractErrorCode.malformedPayload,
     '$field must be an object.',
+  );
+}
+
+void _validateJsonValue(Object? value, String field) {
+  switch (value) {
+    case null || String() || bool():
+      return;
+    case num():
+      if (value.isFinite) {
+        return;
+      }
+    case List<Object?>():
+      for (var index = 0; index < value.length; index += 1) {
+        _validateJsonValue(value[index], '$field[$index]');
+      }
+      return;
+    case Map<String, Object?>():
+      for (final entry in value.entries) {
+        _validateJsonValue(entry.value, '$field.${entry.key}');
+      }
+      return;
+  }
+
+  throw ContractError(
+    ContractErrorCode.malformedPayload,
+    '$field must be JSON-compatible.',
   );
 }

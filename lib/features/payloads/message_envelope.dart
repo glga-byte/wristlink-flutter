@@ -40,7 +40,7 @@ class MessageEnvelope {
       createdAt: createdAt,
       ttl: ttl,
       payload: payload,
-    )..validateSize();
+    )..validate();
   }
 
   final int protocolVersion;
@@ -63,6 +63,26 @@ class MessageEnvelope {
 
   int get serializedSizeBytes => utf8.encode(jsonEncode(toJson())).length;
 
+  void validate() {
+    if (protocolVersion != contractProtocolVersion) {
+      throw ContractError(
+        ContractErrorCode.unsupportedVersion,
+        'Unsupported message contract version: $protocolVersion',
+      );
+    }
+    validateUlid(id);
+    _validateTtl(ttl);
+    if (payload.kind != kind) {
+      throw ContractError(
+        ContractErrorCode.malformedPayload,
+        'Envelope kind ${kind.wireName} does not match payload kind '
+        '${payload.kind.wireName}.',
+      );
+    }
+    payload.validate();
+    validateSize();
+  }
+
   void validateSize() {
     final size = serializedSizeBytes;
     if (size > v1SerializedMessageBudgetBytes) {
@@ -73,6 +93,20 @@ class MessageEnvelope {
       );
     }
   }
+}
+
+void _validateTtl(Duration? value) {
+  if (value == null) {
+    return;
+  }
+  if (value.inSeconds >= 1 &&
+      value.inMicroseconds % Duration.microsecondsPerSecond == 0) {
+    return;
+  }
+  throw const ContractError(
+    ContractErrorCode.malformedPayload,
+    'ttlSec must be a positive whole-second duration when present.',
+  );
 }
 
 String validateUlid(String id, {String field = 'id'}) {

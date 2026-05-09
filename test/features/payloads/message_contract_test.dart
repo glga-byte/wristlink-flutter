@@ -142,6 +142,86 @@ void main() {
       );
     });
 
+    test('constructed outbound messages are fully validated', () {
+      expect(
+        () => _message(id: 'not-a-ulid').validate(),
+        throwsA(
+          isA<ContractError>().having(
+            (error) => error.code,
+            'code',
+            ContractErrorCode.malformedPayload,
+          ),
+        ),
+      );
+
+      expect(
+        () => _message(protocolVersion: 2).validate(),
+        throwsA(
+          isA<ContractError>().having(
+            (error) => error.code,
+            'code',
+            ContractErrorCode.unsupportedVersion,
+          ),
+        ),
+      );
+
+      expect(
+        () => _message(ttl: const Duration(milliseconds: 1)).validate(),
+        throwsA(
+          isA<ContractError>().having(
+            (error) => error.code,
+            'code',
+            ContractErrorCode.malformedPayload,
+          ),
+        ),
+      );
+
+      expect(
+        () => _message(
+          kind: MessageKind.note,
+          payload: const PointPayload(latitude: 1, longitude: 2),
+        ).validate(),
+        throwsA(
+          isA<ContractError>().having(
+            (error) => error.code,
+            'code',
+            ContractErrorCode.malformedPayload,
+          ),
+        ),
+      );
+
+      expect(
+        () => _message(
+          kind: MessageKind.point,
+          payload: const PointPayload(latitude: double.nan, longitude: 2),
+        ).validate(),
+        throwsA(
+          isA<ContractError>().having(
+            (error) => error.code,
+            'code',
+            ContractErrorCode.malformedPayload,
+          ),
+        ),
+      );
+
+      expect(
+        () => _message(
+          kind: MessageKind.command,
+          payload: CommandPayload(
+            name: 'set',
+            args: <String, Object?>{'when': DateTime.utc(2026, 5, 9)},
+          ),
+        ).validate(),
+        throwsA(
+          isA<ContractError>().having(
+            (error) => error.code,
+            'code',
+            ContractErrorCode.malformedPayload,
+          ),
+        ),
+      );
+    });
+
     test('contract metadata matches Dart size budget', () {
       final metadata = _readJson(File('contract/protocol/v1/metadata.json'));
       expect(
@@ -209,4 +289,21 @@ List<File> _fixtureFiles(String path) {
 Map<String, Object?> _readJson(File file) {
   final decoded = jsonDecode(file.readAsStringSync());
   return (decoded as Map).cast<String, Object?>();
+}
+
+MessageEnvelope _message({
+  int protocolVersion = contractProtocolVersion,
+  String id = '01HX7Y8Z9ABCDEFGHJKMNPQRVX',
+  MessageKind kind = MessageKind.note,
+  Duration? ttl,
+  ContractPayload payload = const NotePayload(body: 'Code 1234'),
+}) {
+  return MessageEnvelope(
+    protocolVersion: protocolVersion,
+    id: id,
+    kind: kind,
+    createdAt: DateTime.utc(2026, 5, 9, 12, 2),
+    ttl: ttl,
+    payload: payload,
+  );
 }

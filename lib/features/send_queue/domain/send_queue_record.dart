@@ -18,6 +18,8 @@ class SendQueueRecord {
     required DateTime createdAt,
     GarminDeviceId? deviceId,
   }) {
+    message.validate();
+
     return SendQueueRecord(
       message: message,
       status: SendQueueStatus.pending,
