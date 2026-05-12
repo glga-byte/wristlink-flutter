@@ -40,8 +40,38 @@ abstract interface class ContractPayload {
   Map<String, Object?> toJson();
 }
 
+enum PointIntent {
+  navigate('navigate'),
+  saveWaypoint('save_waypoint');
+
+  const PointIntent(this.wireName);
+
+  final String wireName;
+
+  static PointIntent fromWireName(Object? value) {
+    if (value is! String) {
+      throw const ContractError(
+        ContractErrorCode.malformedPayload,
+        'Point intent must be a string.',
+      );
+    }
+
+    for (final intent in PointIntent.values) {
+      if (intent.wireName == value) {
+        return intent;
+      }
+    }
+
+    throw ContractError(
+      ContractErrorCode.malformedPayload,
+      'Unsupported point intent: $value',
+    );
+  }
+}
+
 class PointPayload implements ContractPayload {
   const PointPayload({
+    required this.intent,
     required this.latitude,
     required this.longitude,
     this.label,
@@ -50,12 +80,14 @@ class PointPayload implements ContractPayload {
 
   factory PointPayload.fromJson(Map<String, Object?> json) {
     validateAllowedKeys(json, const <String>{
+      'intent',
       'label',
       'lat',
       'lon',
       'note',
     }, 'Point payload');
 
+    final intent = PointIntent.fromWireName(json['intent']);
     final latitude = _number(json['lat'], 'lat');
     final longitude = _number(json['lon'], 'lon');
     if (latitude < -90 || latitude > 90) {
@@ -72,6 +104,7 @@ class PointPayload implements ContractPayload {
     }
 
     return PointPayload(
+      intent: intent,
       latitude: latitude,
       longitude: longitude,
       label: _optionalString(json['label'], 'label'),
@@ -82,6 +115,7 @@ class PointPayload implements ContractPayload {
   @override
   MessageKind get kind => MessageKind.point;
 
+  final PointIntent intent;
   final double latitude;
   final double longitude;
   final String? label;
@@ -89,6 +123,7 @@ class PointPayload implements ContractPayload {
 
   @override
   void validate() {
+    PointIntent.fromWireName(intent.wireName);
     _validateNumber(latitude, 'lat');
     _validateNumber(longitude, 'lon');
     if (latitude < -90 || latitude > 90) {
@@ -110,6 +145,7 @@ class PointPayload implements ContractPayload {
   @override
   Map<String, Object?> toJson() {
     return <String, Object?>{
+      'intent': intent.wireName,
       if (label != null) 'label': label,
       'lat': latitude,
       'lon': longitude,

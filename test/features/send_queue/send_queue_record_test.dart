@@ -9,7 +9,11 @@ void main() {
     final record = SendQueueRecord.pending(
       message: _message(
         MessageKind.point,
-        const PointPayload(latitude: 1, longitude: 2),
+        const PointPayload(
+          intent: PointIntent.navigate,
+          latitude: 1,
+          longitude: 2,
+        ),
       ),
       createdAt: createdAt,
       deviceId: const GarminDeviceId('physical:123'),
