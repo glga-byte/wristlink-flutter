@@ -25,8 +25,10 @@ void main() {
     test('invalid v1 message fixtures are rejected with typed errors', () {
       final expectations = <String, ContractErrorCode>{
         'malformed_payload.json': ContractErrorCode.malformedPayload,
+        'missing_point_intent.json': ContractErrorCode.malformedPayload,
         'missing_required_field.json': ContractErrorCode.malformedPayload,
         'unknown_kind.json': ContractErrorCode.unsupportedKind,
+        'unsupported_point_intent.json': ContractErrorCode.malformedPayload,
         'unsupported_version.json': ContractErrorCode.unsupportedVersion,
         'invalid_ulid.json': ContractErrorCode.malformedPayload,
       };
@@ -105,6 +107,10 @@ void main() {
         _readJson(File('contract/fixtures/v1/messages/valid/point.json')),
       );
       expect(point.ttl, const Duration(days: 1));
+      expect(
+        (point.toJson()['payload']! as Map<String, Object?>)['intent'],
+        'navigate',
+      );
       expect(
         (point.toJson()['payload']! as Map<String, Object?>)['note'],
         'Meet here',
@@ -204,7 +210,11 @@ void main() {
       expect(
         () => _message(
           kind: MessageKind.note,
-          payload: const PointPayload(latitude: 1, longitude: 2),
+          payload: const PointPayload(
+            intent: PointIntent.navigate,
+            latitude: 1,
+            longitude: 2,
+          ),
         ).validate(),
         throwsA(
           isA<ContractError>().having(
@@ -218,7 +228,11 @@ void main() {
       expect(
         () => _message(
           kind: MessageKind.point,
-          payload: const PointPayload(latitude: double.nan, longitude: 2),
+          payload: const PointPayload(
+            intent: PointIntent.navigate,
+            latitude: double.nan,
+            longitude: 2,
+          ),
         ).validate(),
         throwsA(
           isA<ContractError>().having(
@@ -244,6 +258,36 @@ void main() {
             ContractErrorCode.malformedPayload,
           ),
         ),
+      );
+    });
+
+    test('point intent is required and restricted to supported values', () {
+      final saveWaypoint = PointPayload.fromJson(<String, Object?>{
+        'intent': 'save_waypoint',
+        'lat': 52.52,
+        'lon': 13.405,
+      });
+
+      expect(saveWaypoint.intent, PointIntent.saveWaypoint);
+      expect(saveWaypoint.toJson(), <String, Object?>{
+        'intent': 'save_waypoint',
+        'lat': 52.52,
+        'lon': 13.405,
+      });
+
+      _expectMalformedPayload(
+        () => PointPayload.fromJson(<String, Object?>{
+          'lat': 52.52,
+          'lon': 13.405,
+        }),
+      );
+
+      _expectMalformedPayload(
+        () => PointPayload.fromJson(<String, Object?>{
+          'intent': 'route',
+          'lat': 52.52,
+          'lon': 13.405,
+        }),
       );
     });
 

@@ -21,7 +21,7 @@ The system SHALL serialize every phone-to-watch command into a contract-defined 
 
 #### Scenario: Point message is serialized
 - **WHEN** the user sends a point payload
-- **THEN** the system serializes a contract-compatible envelope with kind `point` and point-specific data under the payload field
+- **THEN** the system serializes a contract-compatible envelope with kind `point` and point-specific data under the payload field, including a required `intent` value of `navigate` or `save_waypoint`
 
 #### Scenario: Timer message is serialized
 - **WHEN** the user sends a timer payload
@@ -49,6 +49,25 @@ The system SHALL enforce the shared contract's v1 serialized payload budget befo
 #### Scenario: Native reports too large
 - **WHEN** native Garmin transport reports that serialized input data is too large
 - **THEN** the system maps the platform failure to the same typed payload-too-large domain error
+
+### Requirement: Point Payload Intent
+The system SHALL require every v1 point payload to declare an `intent` field that tells the watch how to handle the point.
+
+#### Scenario: Point requests navigation
+- **WHEN** a v1 point payload contains `intent` set to `navigate`
+- **THEN** the payload is valid when all other point fields satisfy the contract
+
+#### Scenario: Point requests waypoint saving
+- **WHEN** a v1 point payload contains `intent` set to `save_waypoint`
+- **THEN** the payload is valid when all other point fields satisfy the contract
+
+#### Scenario: Point intent is missing
+- **WHEN** a v1 point payload omits `intent`
+- **THEN** the system rejects the payload as malformed
+
+#### Scenario: Point intent is unsupported
+- **WHEN** a v1 point payload contains an `intent` value other than `navigate` or `save_waypoint`
+- **THEN** the system rejects the payload as malformed
 
 ### Requirement: Contract Validation
 The system SHALL validate Flutter serialization and parsing behavior against shared contract fixtures before relying on a payload shape in send queue or Garmin bridge behavior.
