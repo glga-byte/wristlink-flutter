@@ -67,6 +67,8 @@ integration_test/      # Integration scenarios when needed
   failures, including too-large app-message payloads, to typed Dart domain
   errors. Do not add payload business rules in native bridge code.
 - When a feature introduces durable project knowledge, architecture rules, platform constraints, verification steps, or conventions that future agents must follow, update `AGENTS.md` as part of the same change.
+- When Paper design files are updated, update the corresponding PNG snapshots
+  in `docs/design/paper/` in the same change so design reviews stay in sync.
 
 ## Local Tooling
 
