@@ -3,12 +3,13 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const devUuid = '11111111-1111-1111-1111-111111111111';
-  const prodUuid = '22222222-2222-2222-2222-222222222222';
+  const devUuidKey = 'WRISTLINK_DEV_CONNECT_IQ_APP_UUID';
+  const prodUuidKey = 'WRISTLINK_PROD_CONNECT_IQ_APP_UUID';
   const androidUuidKey = 'WRISTLINK_CONNECT_IQ_APP_UUID';
   final sharedFlavorConfig = File(
     'config/wristlink-flavors.xcconfig',
   ).readAsStringSync();
+  final sharedFlavorValues = _parseXcconfigValues(sharedFlavorConfig);
 
   group('Android flavor configuration', () {
     final buildGradle = File('android/app/build.gradle.kts').readAsStringSync();
@@ -51,16 +52,13 @@ void main() {
           'wristLinkFlavorConfigValue(WRISTLINK_PROD_CONNECT_IQ_APP_UUID)',
         ),
       );
+      final devUuid = sharedFlavorValues[devUuidKey];
+      final prodUuid = sharedFlavorValues[prodUuidKey];
+      expect(devUuid, isAConnectIqUuid);
+      expect(prodUuid, isAConnectIqUuid);
+      expect(devUuid, isNot(prodUuid));
       expect(buildGradle, isNot(contains(devUuid)));
       expect(buildGradle, isNot(contains(prodUuid)));
-      expect(
-        sharedFlavorConfig,
-        contains('WRISTLINK_DEV_CONNECT_IQ_APP_UUID = $devUuid'),
-      );
-      expect(
-        sharedFlavorConfig,
-        contains('WRISTLINK_PROD_CONNECT_IQ_APP_UUID = $prodUuid'),
-      );
       expect(
         manifest,
         contains('android:name="com.wristlink.CONNECT_IQ_APP_ID"'),
@@ -166,14 +164,8 @@ void main() {
           contains('#include "Flavor-prod.xcconfig"'),
         ),
       );
-      expect(
-        sharedFlavorConfig,
-        contains('WRISTLINK_DEV_CONNECT_IQ_APP_UUID = $devUuid'),
-      );
-      expect(
-        sharedFlavorConfig,
-        contains('WRISTLINK_PROD_CONNECT_IQ_APP_UUID = $prodUuid'),
-      );
+      expect(sharedFlavorConfig, contains(devUuidKey));
+      expect(sharedFlavorConfig, contains(prodUuidKey));
       expect(
         infoPlist,
         contains(r'<string>$(WRISTLINK_CONNECT_IQ_APP_UUID)</string>'),
@@ -205,4 +197,25 @@ void main() {
       expect(bridge, isNot(contains('00000000-0000-0000-0000-000000000000')));
     });
   });
+}
+
+final Matcher isAConnectIqUuid = matches(
+  RegExp(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    caseSensitive: false,
+  ),
+);
+
+Map<String, String> _parseXcconfigValues(String contents) {
+  final values = <String, String>{};
+
+  for (final line in contents.split('\n')) {
+    final match = RegExp(r'^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$').firstMatch(line);
+    if (match == null) {
+      continue;
+    }
+    values[match.group(1)!] = match.group(2)!;
+  }
+
+  return values;
 }
