@@ -10,7 +10,7 @@ The system SHALL configure the WristLink Connect IQ companion app UUID through F
 #### Scenario: Prod flavor uses production app identifier
 - **WHEN** CI builds the `prod` Flutter flavor
 - **THEN** Android and iOS native metadata use `22222222-2222-2222-2222-222222222222` until that placeholder is replaced with the real production Connect IQ app UUID
-- **AND** production UUID replacement does not require source-file edits outside flavor build configuration
+- **AND** production UUID replacement is made in `config/wristlink-flavors.xcconfig`
 
 #### Scenario: Flavors install side by side
 - **WHEN** the `dev` and `prod` Flutter flavors are installed on the same Android or iOS phone
@@ -20,7 +20,15 @@ The system SHALL configure the WristLink Connect IQ companion app UUID through F
 #### Scenario: Flavor metadata uses one logical key
 - **WHEN** Android or iOS app metadata is built for any supported flavor
 - **THEN** the platform metadata value used by the native Garmin discovery bridge is populated from `WRISTLINK_CONNECT_IQ_APP_UUID` for that flavor
-- **AND** the UUID is owned in one flavor build setting location per platform rather than duplicated in native source, Android manifest literals, or iOS Info.plist literals
+- **AND** the UUID values are owned in `config/wristlink-flavors.xcconfig` rather than duplicated in native source, Android manifest literals, iOS Info.plist literals, or per-platform flavor build files
+
+#### Scenario: Platform build systems consume the shared flavor config
+- **WHEN** Android builds the `dev` or `prod` flavor
+- **THEN** Gradle reads the selected Connect IQ app UUID from `config/wristlink-flavors.xcconfig`
+- **AND** feeds that value into Android manifest metadata substitution
+- **WHEN** iOS builds the `dev` or `prod` flavor
+- **THEN** the selected flavor xcconfig includes `config/wristlink-flavors.xcconfig`
+- **AND** maps the selected flavor constant to `WRISTLINK_CONNECT_IQ_APP_UUID`
 
 #### Scenario: UUID values are treated uniformly
 - **WHEN** the native Garmin discovery bridge reads the selected flavor's Connect IQ app UUID
@@ -33,4 +41,4 @@ The system SHALL configure the WristLink Connect IQ companion app UUID through F
 
 #### Scenario: iOS flavor schemes drive build settings
 - **WHEN** Flutter builds iOS with `--flavor dev` or `--flavor prod`
-- **THEN** the selected Xcode scheme and flavor build configuration provide `PRODUCT_BUNDLE_IDENTIFIER`, `WRISTLINK_CONNECT_IQ_APP_UUID`, and `WRISTLINK_GARMIN_CALLBACK_SCHEME`
+- **THEN** the selected Xcode scheme and flavor build configuration provide `PRODUCT_BUNDLE_IDENTIFIER`, `WRISTLINK_CONNECT_IQ_APP_UUID`, and `WRISTLINK_GARMIN_CALLBACK_SCHEME` through the included flavor xcconfig

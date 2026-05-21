@@ -32,7 +32,7 @@
             android:value="2" />
         <meta-data
             android:name="com.wristlink.CONNECT_IQ_APP_ID"
-            android:value="00000000-0000-0000-0000-000000000000" />
+            android:value="${WRISTLINK_CONNECT_IQ_APP_UUID}" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

@@ -7,9 +7,7 @@ final class GarminDeviceBridge: NSObject, IQUIOverrideDelegate, IQDeviceEventDel
 
   private static let channelName = "wristlink/garmin_devices"
   private static let eventChannelName = "wristlink/garmin_device_events"
-  private static let callbackScheme = "wristlink-ciq"
-  private static let connectIqAppIdPlaceholder =
-    "00000000-0000-0000-0000-000000000000"
+  private static let callbackSchemeInfoKey = "WristLinkGarminCallbackScheme"
 
   private var pendingRequest: DiscoveryRequest?
   private var latestDevices: [UUID: IQDevice] = [:]
@@ -315,12 +313,20 @@ final class GarminDeviceBridge: NSObject, IQUIOverrideDelegate, IQDeviceEventDel
     guard
       let value = Bundle.main.object(forInfoDictionaryKey: "WristLinkConnectIQAppUUID")
         as? String,
-      !value.isEmpty,
-      value != Self.connectIqAppIdPlaceholder
+      !value.isEmpty
     else {
       return nil
     }
     return UUID(uuidString: value)
+  }
+
+  private static var callbackScheme: String {
+    guard
+      let value = Bundle.main.object(forInfoDictionaryKey: callbackSchemeInfoKey) as? String
+    else {
+      return ""
+    }
+    return value.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 }
 

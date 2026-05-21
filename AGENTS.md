@@ -45,7 +45,8 @@ integration_test/      # Integration scenarios when needed
 - Device-aware Flutter screens must consume `DeviceDirectory` and presentation mappers under `lib/features/devices/`.
 - Emulator device logic is intentionally absent. The Developer Tools settings surface is currently presentational only and must not create devices, persist emulator settings, override discovery, change the default watch, or affect send readiness until a future change reintroduces emulator behavior from scratch.
 - Default watch and latest authorized devices use explicit platform `DeviceSettingsStore` providers: Android/iOS persist through the required `wristlink/device_settings` Platform Channel, web persists through the web-backed store, and unsupported platforms must surface unsupported storage instead of silently falling back to volatile memory. Keep native/web storage as simple key/value persistence and JSON mapping in Dart.
-- Native Garmin discovery uses the `wristlink/garmin_devices` Platform Channel. Companion install checks require configuring the separate Connect IQ watch app UUID in Android manifest metadata `com.wristlink.CONNECT_IQ_APP_ID` and iOS `WristLinkConnectIQAppUUID`; placeholder UUIDs intentionally map companion state to unknown.
+- Native Garmin discovery uses the `wristlink/garmin_devices` Platform Channel. Companion install checks require the separate Connect IQ watch app UUID to be configured by Flutter flavor through the shared build setting key `WRISTLINK_CONNECT_IQ_APP_UUID`, which feeds Android manifest metadata `com.wristlink.CONNECT_IQ_APP_ID` and iOS `WristLinkConnectIQAppUUID`. Use the `dev` flavor for local development and the `prod` flavor for CI/release. The shared flavor UUID values live in `config/wristlink-flavors.xcconfig`; Android reads that file from Gradle, and iOS flavor xcconfigs include it through `ios/Flutter/Flavor-dev.xcconfig` and `ios/Flutter/Flavor-prod.xcconfig`. The committed placeholder UUIDs are ordinary configured UUID values and must be replaced in that shared config with real Garmin Connect IQ app UUIDs when available.
+- Flutter flavors must remain installable side by side: Android `dev` uses `com.wristlink.wristlink_flutter.dev`, Android `prod` uses `com.wristlink.wristlink_flutter`, iOS `dev` uses `com.wristlink.wristlinkFlutter.dev`, and iOS `prod` uses `com.wristlink.wristlinkFlutter`. iOS Garmin callback schemes are flavor-specific through `WRISTLINK_GARMIN_CALLBACK_SCHEME`: `wristlink-ciq-dev` for `dev` and `wristlink-ciq` for `prod`.
 - Native Garmin device status changes use the `wristlink/garmin_device_events` Event Channel and must update `DeviceDirectory` through the typed Dart Garmin discovery gateway; do not keep status callbacks native-only.
 - On iOS, Garmin device discovery uses Garmin Connect Mobile handoff/callback. Cache only the latest authorized device list and handle cancellation, missing Garmin Connect, timeouts, and app suspension as typed domain outcomes.
 - The send queue must survive app restarts and missing watch connectivity.
@@ -77,7 +78,7 @@ integration_test/      # Integration scenarios when needed
 - Do not change global `JAVA_HOME` just to run project checks. If a direct `./gradlew` command picks up an unsupported system JDK, prefix that command with Android Studio's bundled JDK for this invocation only:
 
 ```sh
-JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDevDebugUnitTest testProdDebugUnitTest
 ```
 
 ## Verification
@@ -91,7 +92,9 @@ flutter test
 # When message contract assets or Dart contract models change:
 flutter test test/features/payloads
 # When native SDK bridge changes are included:
-cd android && JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
-flutter build apk --debug
-flutter build ios --no-codesign
+cd android && JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDevDebugUnitTest testProdDebugUnitTest
+flutter build apk --debug --flavor dev
+flutter build apk --debug --flavor prod
+flutter build ios --no-codesign --flavor dev
+flutter build ios --no-codesign --flavor prod
 ```

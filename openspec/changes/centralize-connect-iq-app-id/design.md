@@ -11,7 +11,7 @@ This keeps the Garmin SDK boundary in the right native layer, but duplicates the
 - Add `dev` and `prod` Flutter flavors for Connect IQ companion app configuration.
 - Make `dev` and `prod` installable side by side on the same Android or iOS phone.
 - Define one logical Connect IQ companion app UUID key per flavor.
-- Use one flavor-owned build setting location per platform for the UUID values; do not duplicate the UUID in native source or platform metadata files.
+- Use one shared flavor configuration file for the UUID values; do not duplicate the UUID in native source, platform metadata files, or per-platform build configuration.
 - Feed the selected flavor UUID into Android manifest metadata and iOS Info.plist metadata.
 - Require `dev` builds to use the development Connect IQ app UUID configured for the `dev` flavor.
 - Require `prod` builds to use the production Connect IQ app UUID configured for the `prod` flavor.
@@ -46,24 +46,26 @@ Android should continue exposing `com.wristlink.CONNECT_IQ_APP_ID`, and iOS shou
 
 This minimizes risk in the Garmin bridge and keeps the platform metadata contract explicit for tests and future native work.
 
-### Use one logical key across flavor-specific platform files
+### Use one shared flavor constants file across platform build systems
 
-The implementation should use the logical key `WRISTLINK_CONNECT_IQ_APP_UUID` for both Android and iOS. Android product flavors should define the value once in Gradle flavor configuration and feed that key into manifest metadata substitution. iOS flavor build configurations should define the value once through xcconfig/build settings and feed the same key into `Info.plist` build-setting substitution.
+The implementation should use `config/wristlink-flavors.xcconfig` as the single source for committed flavor UUID constants. That file should define `WRISTLINK_DEV_CONNECT_IQ_APP_UUID` and `WRISTLINK_PROD_CONNECT_IQ_APP_UUID` using simple `KEY = VALUE` syntax that iOS can include directly and Android Gradle can parse.
 
-This keeps the platform metadata names stable while making the flavor value explicit. A separate cross-platform configuration file is not required; the centralization boundary is one platform build setting per flavor, with identical key and flavor names across Android and iOS.
+iOS flavor xcconfigs should map the selected flavor constant to the shared logical metadata key `WRISTLINK_CONNECT_IQ_APP_UUID`. Android product flavors should read the same shared file and feed the selected value into manifest metadata substitution under `WRISTLINK_CONNECT_IQ_APP_UUID`.
+
+This keeps native platform metadata names stable while making UUID replacement a one-file operation. The small Android parser is acceptable because the shared file intentionally stays within a simple xcconfig/property subset.
 
 ### Make production UUID selection flavor-owned
 
 The `prod` flavor should own the production Connect IQ app UUID through flavor-specific build configuration. CI should select the `prod` flavor, not supply a different UUID for each release.
 
-The `dev` flavor should own the development Connect IQ app UUID the same way. Both UUIDs should be hardcoded in flavor build configuration, not supplied at runtime, and native code should not recognize any magic placeholder UUID value.
+The `dev` flavor should own the development Connect IQ app UUID the same way. Both UUIDs should be hardcoded in shared flavor configuration, not supplied at runtime, and native code should not recognize any magic placeholder UUID value.
 
 Until real Garmin Connect IQ companion app UUIDs are available, the committed flavor configuration SHALL use syntactically valid placeholder UUIDs:
 
 - `dev`: `11111111-1111-1111-1111-111111111111`
 - `prod`: `22222222-2222-2222-2222-222222222222`
 
-These placeholder UUIDs are documentation placeholders only. The app must still pass them through native metadata and Garmin bridge code as ordinary UUID values. Project documentation must identify the exact Android and iOS flavor build settings where the values are replaced with real Connect IQ app UUIDs.
+These placeholder UUIDs are documentation placeholders only. The app must still pass them through native metadata and Garmin bridge code as ordinary UUID values. Project documentation must identify `config/wristlink-flavors.xcconfig` as the exact replacement point for real Connect IQ app UUIDs.
 
 ### Make dev and prod separately installable
 
@@ -77,7 +79,7 @@ The production identifiers should remain the canonical app identifiers. The deve
 
 iOS should model Flutter flavors with shared Xcode schemes named `dev` and `prod`. Each scheme should select flavor-specific build configurations based on the standard Flutter configuration types, for example `Debug-dev`, `Profile-dev`, `Release-dev`, `Debug-prod`, `Profile-prod`, and `Release-prod`.
 
-Each flavor configuration should continue to include the appropriate Flutter base xcconfig (`Debug.xcconfig` for debug, `Release.xcconfig` for release/profile) and add only the flavor-specific build settings needed for this change: `PRODUCT_BUNDLE_IDENTIFIER`, `WRISTLINK_CONNECT_IQ_APP_UUID`, and `WRISTLINK_GARMIN_CALLBACK_SCHEME`.
+Each build-mode-and-flavor configuration should continue to include the appropriate Flutter base xcconfig (`Debug.xcconfig` for debug, `Release.xcconfig` for release/profile) and then include a flavor xcconfig. The flavor xcconfigs should include the shared config and add only the flavor-specific build settings needed for this change: `PRODUCT_BUNDLE_IDENTIFIER`, `WRISTLINK_CONNECT_IQ_APP_UUID`, and `WRISTLINK_GARMIN_CALLBACK_SCHEME`.
 
 This follows Flutter's iOS flavor model, where `--flavor` selects an Xcode scheme, while keeping Garmin-specific values in build settings rather than native Swift source.
 
@@ -91,5 +93,5 @@ Production SHALL use `wristlink-ciq`. Development SHALL use `wristlink-ciq-dev`.
 
 - A flavor is configured with a placeholder or wrong real UUID -> companion status checks may query a non-existent or wrong Connect IQ app. Mitigation: hardcode visible placeholder values until real values are available, pass all syntactically valid UUIDs through uniformly, and document the replacement points.
 - Local developers need a private dev UUID -> a committed development UUID may not fit every workflow. Mitigation: treat the committed `dev` UUID as the project default and document how to change it intentionally if needed.
-- Android and iOS flavor mechanisms differ -> a literal single source file would require glue code. Mitigation: keep one build-setting location per platform flavor and use identical logical keys and flavor names across Android and iOS.
+- Android and iOS flavor mechanisms differ -> the shared xcconfig file requires Android Gradle parsing glue. Mitigation: keep the shared file in a simple `KEY = VALUE` subset and cover the parser with platform flavor configuration tests plus Android flavor builds.
 - Flavors can expand scope into signing, bundle ids, icons, and schemes -> implementation may grow beyond UUID selection. Mitigation: include only the identifier and scheme/configuration work required for side-by-side `dev` and `prod` installs, and defer unrelated branding unless builds require it.

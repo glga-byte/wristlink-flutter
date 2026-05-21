@@ -361,9 +361,7 @@ internal class GarminDeviceBridge(
             PackageManager.GET_META_DATA,
         ).metaData
         val value = metadata?.getString(CONNECT_IQ_APP_ID_META_DATA)?.trim().orEmpty()
-        return value.takeUnless {
-            it.isEmpty() || it == CONNECT_IQ_APP_ID_PLACEHOLDER
-        }
+        return value.takeUnless { it.isEmpty() }
     }
 
     private fun isPackageInstalled(packageName: String): Boolean {
@@ -382,7 +380,6 @@ internal class GarminDeviceBridge(
         const val GARMIN_CONNECT_IQ_PACKAGE = "com.garmin.connectiq"
         const val TAG = "WristLinkGarminBridge"
         const val CONNECT_IQ_APP_ID_META_DATA = "com.wristlink.CONNECT_IQ_APP_ID"
-        const val CONNECT_IQ_APP_ID_PLACEHOLDER = "00000000-0000-0000-0000-000000000000"
         const val COMPANION_STATUS_TIMEOUT_MS = 3000L
         const val SDK_INIT_TIMEOUT_MS = 10000L
     }
