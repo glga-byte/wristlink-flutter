@@ -45,7 +45,8 @@ integration_test/      # Integration scenarios when needed
 - Device-aware Flutter screens must consume `DeviceDirectory` and presentation mappers under `lib/features/devices/`.
 - Emulator device logic is intentionally absent. The Developer Tools settings surface is currently presentational only and must not create devices, persist emulator settings, override discovery, change the default watch, or affect send readiness until a future change reintroduces emulator behavior from scratch.
 - Default watch and latest authorized devices use explicit platform `DeviceSettingsStore` providers: Android/iOS persist through the required `wristlink/device_settings` Platform Channel, web persists through the web-backed store, and unsupported platforms must surface unsupported storage instead of silently falling back to volatile memory. Keep native/web storage as simple key/value persistence and JSON mapping in Dart.
-- Native Garmin discovery uses the `wristlink/garmin_devices` Platform Channel. Companion install checks require configuring the separate Connect IQ watch app UUID in Android manifest metadata `com.wristlink.CONNECT_IQ_APP_ID` and iOS `WristLinkConnectIQAppUUID`; placeholder UUIDs intentionally map companion state to unknown.
+- Connect IQ companion app UUIDs are flavor-owned in `config/wristlink-flavors.xcconfig`. Android must read that file and expose the selected value as manifest metadata `com.wristlink.CONNECT_IQ_APP_ID`; iOS flavor xcconfigs must map it to `WristLinkConnectIQAppUUID`. Do not duplicate UUID literals in native/platform files or add placeholder special handling.
+- Keep `dev` and `prod` installable side by side. Android ids are `com.wristlink.wristlink_flutter.dev` and `com.wristlink.wristlink_flutter`; iOS bundle ids are `com.wristlink.wristlinkFlutter.dev` and `com.wristlink.wristlinkFlutter`; iOS callback schemes are `wristlink-ciq-dev` and `wristlink-ciq`.
 - Native Garmin device status changes use the `wristlink/garmin_device_events` Event Channel and must update `DeviceDirectory` through the typed Dart Garmin discovery gateway; do not keep status callbacks native-only.
 - On iOS, Garmin device discovery uses Garmin Connect Mobile handoff/callback. Cache only the latest authorized device list and handle cancellation, missing Garmin Connect, timeouts, and app suspension as typed domain outcomes.
 - The send queue must survive app restarts and missing watch connectivity.
@@ -67,6 +68,8 @@ integration_test/      # Integration scenarios when needed
   failures, including too-large app-message payloads, to typed Dart domain
   errors. Do not add payload business rules in native bridge code.
 - When a feature introduces durable project knowledge, architecture rules, platform constraints, verification steps, or conventions that future agents must follow, update `AGENTS.md` as part of the same change.
+- When Paper design files are updated, update the corresponding PNG snapshots
+  in `docs/design/paper/` in the same change so design reviews stay in sync.
 
 ## Local Tooling
 
@@ -75,7 +78,7 @@ integration_test/      # Integration scenarios when needed
 - Do not change global `JAVA_HOME` just to run project checks. If a direct `./gradlew` command picks up an unsupported system JDK, prefix that command with Android Studio's bundled JDK for this invocation only:
 
 ```sh
-JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDevDebugUnitTest testProdDebugUnitTest
 ```
 
 ## Verification
@@ -89,7 +92,9 @@ flutter test
 # When message contract assets or Dart contract models change:
 flutter test test/features/payloads
 # When native SDK bridge changes are included:
-cd android && JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
-flutter build apk --debug
-flutter build ios --no-codesign
+cd android && JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDevDebugUnitTest testProdDebugUnitTest
+flutter build apk --debug --flavor dev
+flutter build apk --debug --flavor prod
+flutter build ios --no-codesign --flavor dev
+flutter build ios --no-codesign --flavor prod
 ```

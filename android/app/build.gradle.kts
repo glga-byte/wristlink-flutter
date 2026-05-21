@@ -5,6 +5,27 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+private val WRISTLINK_CONNECT_IQ_APP_UUID = "WRISTLINK_CONNECT_IQ_APP_UUID"
+private val WRISTLINK_DEV_CONNECT_IQ_APP_UUID = "WRISTLINK_DEV_CONNECT_IQ_APP_UUID"
+private val WRISTLINK_PROD_CONNECT_IQ_APP_UUID = "WRISTLINK_PROD_CONNECT_IQ_APP_UUID"
+private val WRISTLINK_FLAVOR_CONFIG_PATH = "../config/wristlink-flavors.xcconfig"
+
+private val wristLinkFlavorConfig: Map<String, String> =
+    rootProject.file(WRISTLINK_FLAVOR_CONFIG_PATH).readLines().mapNotNull { rawLine ->
+        val line = rawLine.substringBefore("//").trim()
+        if (line.isBlank() || line.startsWith("#")) {
+            null
+        } else {
+            val separator = line.indexOf('=')
+            require(separator >= 0) { "Invalid WristLink flavor config line: $rawLine" }
+            line.substring(0, separator).trim() to line.substring(separator + 1).trim()
+        }
+    }.toMap()
+
+private fun wristLinkFlavorConfigValue(key: String): String =
+    wristLinkFlavorConfig[key]
+        ?: error("Missing $key in $WRISTLINK_FLAVOR_CONFIG_PATH")
+
 android {
     namespace = "com.wristlink.wristlink_flutter"
     compileSdk = flutter.compileSdkVersion
@@ -20,7 +41,6 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.wristlink.wristlink_flutter"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -28,6 +48,21 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    flavorDimensions += "environment"
+    productFlavors {
+        create("dev") {
+            dimension = "environment"
+            applicationIdSuffix = ".dev"
+            manifestPlaceholders[WRISTLINK_CONNECT_IQ_APP_UUID] =
+                wristLinkFlavorConfigValue(WRISTLINK_DEV_CONNECT_IQ_APP_UUID)
+        }
+        create("prod") {
+            dimension = "environment"
+            manifestPlaceholders[WRISTLINK_CONNECT_IQ_APP_UUID] =
+                wristLinkFlavorConfigValue(WRISTLINK_PROD_CONNECT_IQ_APP_UUID)
+        }
     }
 
     buildTypes {

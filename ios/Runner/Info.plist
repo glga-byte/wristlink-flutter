@@ -29,7 +29,7 @@
 			<string>com.wristlink.garmin-callback</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>wristlink-ciq</string>
+				<string>$(WRISTLINK_GARMIN_CALLBACK_SCHEME)</string>
 			</array>
 		</dict>
 	</array>
@@ -46,7 +46,9 @@
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>WristLink uses Garmin Connect IQ to discover authorized watches for sending data.</string>
 	<key>WristLinkConnectIQAppUUID</key>
-	<string>00000000-0000-0000-0000-000000000000</string>
+	<string>$(WRISTLINK_CONNECT_IQ_APP_UUID)</string>
+	<key>WristLinkGarminCallbackScheme</key>
+	<string>$(WRISTLINK_GARMIN_CALLBACK_SCHEME)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
