@@ -1,0 +1,32 @@
+{
+  "cases": [
+    {
+      "platform": "android",
+      "rawDeviceId": "731942318",
+      "canonicalDeviceId": "physical:731942318",
+      "discoveryPayload": {
+        "id": "731942318",
+        "name": "Forerunner 965",
+        "modelName": "Forerunner 965",
+        "family": "006-B4444-00",
+        "unitId": "731942318",
+        "reachability": "reachable",
+        "companionInstallState": "installed"
+      }
+    },
+    {
+      "platform": "ios",
+      "rawDeviceId": "7E57D004-2B97-4B2D-9A13-7C8E491F6A20",
+      "canonicalDeviceId": "physical:7E57D004-2B97-4B2D-9A13-7C8E491F6A20",
+      "discoveryPayload": {
+        "id": "7E57D004-2B97-4B2D-9A13-7C8E491F6A20",
+        "name": "fēnix 8",
+        "modelName": "fēnix 8",
+        "family": "006-B5555-00",
+        "unitId": "7E57D004-2B97-4B2D-9A13-7C8E491F6A20",
+        "reachability": "reachable",
+        "companionInstallState": "installed"
+      }
+    }
+  ]
+}

@@ -19,6 +19,21 @@ The system SHALL persist every submitted point envelope, selected physical devic
 - **WHEN** the queue cannot durably store a point
 - **THEN** the system does not invoke Garmin transport and reports that the point was not queued
 
+### Requirement: Stable Physical Target Identity
+The system SHALL store physical watch targets as canonical Dart device ids and SHALL explicitly convert them to the raw platform-specific ids used by the native Garmin SDK at the typed transport boundary.
+
+#### Scenario: Android discovered target is sent
+- **WHEN** Android discovery returns a numeric Garmin device id and a queue record later targets the resulting canonical physical id
+- **THEN** the send channel passes the original numeric id without the Dart `physical:` namespace prefix and native lookup resolves the discovered device
+
+#### Scenario: iOS discovered target is sent
+- **WHEN** iOS discovery returns a Garmin device UUID and a queue record later targets the resulting canonical physical id
+- **THEN** the send channel passes the original UUID without the Dart `physical:` namespace prefix and native lookup resolves the authorized device
+
+#### Scenario: Invalid target reaches the typed send boundary
+- **WHEN** a send request contains an empty, malformed, or non-physical Dart device id
+- **THEN** the typed Dart gateway rejects it before invoking native Garmin transport
+
 ### Requirement: Explicit Queue State Machine
 The system SHALL maintain each queue record in exactly one of the explicit domain statuses pending, sending, sent, or failed and SHALL persist every transition before publishing it to the UI.
 
@@ -79,6 +94,14 @@ The system SHALL attempt eligible pending records on submission, app startup or 
 #### Scenario: Background execution is delayed
 - **WHEN** the operating system postpones or denies scheduled background work
 - **THEN** pending records remain durable and are reconsidered at the next startup, foreground, device-readiness, or background trigger
+
+#### Scenario: Cold process restores eligible work
+- **WHEN** foreground or background composition starts with persisted authorized devices and eligible queue records but no in-memory native Garmin device/app cache
+- **THEN** the system rehydrates current platform transport state before claiming a record or invoking Garmin send
+
+#### Scenario: Transport hydration is unavailable
+- **WHEN** current native Garmin transport state cannot be re-established during startup
+- **THEN** persisted targets are not treated as currently ready, affected records remain pending, and later foreground, readiness, or background triggers may retry hydration and delivery
 
 #### Scenario: Triggers overlap
 - **WHEN** multiple retry triggers occur for the same record

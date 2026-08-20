@@ -49,6 +49,10 @@ The system SHALL preserve the original shared content and parse coordinates and 
 - **WHEN** shared content includes a supported `google.com/maps` URL with valid coordinates
 - **THEN** the system creates a point draft from those coordinates and uses an available place label as the editable default name
 
+#### Scenario: Google Maps URL uses selected-place data coordinates
+- **WHEN** a supported direct URL or short-link destination contains exactly one valid adjacent `!3d<latitude>!4d<longitude>` pair in its Google Maps data segment
+- **THEN** the system creates a point draft from that pair and uses an available place label as the editable default name
+
 #### Scenario: Google Maps short link resolves
 - **WHEN** shared content includes a supported `maps.app.goo.gl` or `goo.gl/maps` short link that redirects to a parseable Google Maps URL
 - **THEN** the system follows bounded HTTPS redirects and parses the resulting coordinates and available label
@@ -64,6 +68,10 @@ The system SHALL preserve the original shared content and parse coordinates and 
 #### Scenario: Parsed coordinates are out of range
 - **WHEN** candidate latitude or longitude values fall outside the v1 point contract ranges
 - **THEN** the system rejects the candidate and does not create a sendable point draft
+
+#### Scenario: Google Maps data coordinates are ambiguous
+- **WHEN** no higher-priority supported coordinate representation is present and a Google Maps data segment contains more than one distinct adjacent latitude/longitude pair
+- **THEN** the system rejects the candidates as ambiguous rather than selecting a point arbitrarily
 
 #### Scenario: Short-link resolution is unavailable
 - **WHEN** a supported short link cannot be resolved because of timeout, connectivity, redirect-limit, or invalid destination
@@ -97,7 +105,7 @@ The system SHALL provide a common confirmation screen for manual and shared poin
 - **THEN** the system prevents submission and identifies the field that must be corrected
 
 ### Requirement: Shared Device Readiness
-The point confirmation flow SHALL derive the default watch, reachability, and companion installation readiness from the shared `DeviceDirectory` rather than maintaining screen-local device state.
+The point confirmation flow SHALL derive the default watch, current transport-backed reachability, and companion installation readiness from the shared `DeviceDirectory` rather than maintaining screen-local device state or treating a persisted reachability snapshot as current process readiness.
 
 #### Scenario: Default watch is ready
 - **WHEN** the shared directory resolves a reachable default watch with the companion app installed
@@ -106,6 +114,10 @@ The point confirmation flow SHALL derive the default watch, reachability, and co
 #### Scenario: Default watch is offline
 - **WHEN** the shared directory resolves a known default watch with the companion app installed but not currently reachable
 - **THEN** confirmation permits queueing and explains that delivery will retry when the watch reconnects
+
+#### Scenario: Persisted watch awaits transport restoration
+- **WHEN** the app restores a previously ready default watch after a process restart but native Garmin transport state has not yet been rehydrated
+- **THEN** the watch remains a known target but is not presented as ready for immediate transport until current platform readiness is established
 
 #### Scenario: No usable target is configured
 - **WHEN** there is no default watch, the stored default is missing, or its companion app is not installed
@@ -129,4 +141,3 @@ The system SHALL validate and durably enqueue a contract-compatible point envelo
 #### Scenario: Point exceeds contract budget
 - **WHEN** the serialized point envelope exceeds the v1 UTF-8 byte budget
 - **THEN** the system does not invoke native Garmin transport and asks the user to shorten editable content
-

@@ -21,7 +21,24 @@ flutter build apk --debug --flavor prod
 flutter build ios --no-codesign --flavor prod
 ```
 
+### Google Maps API keys
+
+Follow Google's
+[Maps SDK for Android setup guide](https://developers.google.com/maps/documentation/android-sdk/get-api-key)
+to enable billing and create a restricted API key. Then create the local config:
+
+```sh
+cp config/wristlink-maps.example.xcconfig \
+  config/wristlink-maps.local.xcconfig
+```
+
+Replace the example values with the dev/prod keys. The local file is ignored by Git; rebuild the app after changing it.
+
+### Connect IQ app UUIDs
+
 The Connect IQ companion app UUID is selected by flavor through `WRISTLINK_CONNECT_IQ_APP_UUID`. Replace the committed placeholder UUIDs in `config/wristlink-flavors.xcconfig` with the real development and production Garmin Connect IQ app UUIDs when they are available.
+
+### Verification
 
 Run the baseline checks with:
 

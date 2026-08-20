@@ -50,6 +50,42 @@ class LocalDeviceDirectory extends ChangeNotifier
   }
 
   @override
+  Future<DeviceRefreshResult> hydrateTransport() async {
+    final authorizedDevices = List<GarminDevice>.of(_devices);
+    _devices = _devices
+        .map(
+          (device) => device.copyWith(reachability: DeviceReachability.unknown),
+        )
+        .toList(growable: false);
+    _recompose();
+    notifyListeners();
+
+    try {
+      final hydratedById = <GarminDeviceId, GarminDevice>{
+        for (final device in _physicalDevicesOnly(
+          await _discoveryGateway.hydrateTransport(authorizedDevices),
+        ))
+          device.id: device,
+      };
+      _devices = _devices
+          .map((device) => hydratedById[device.id] ?? device)
+          .toList(growable: false);
+      _recompose();
+      notifyListeners();
+      return DeviceRefreshSuccess(devices);
+    } on GarminDiscoveryError catch (error) {
+      return DeviceRefreshFailure(error);
+    } on Object catch (error) {
+      return DeviceRefreshFailure(
+        GarminDiscoveryError(
+          GarminDiscoveryErrorCode.nativeFailure,
+          'Garmin transport hydration failed: $error',
+        ),
+      );
+    }
+  }
+
+  @override
   Future<DeviceRefreshResult> refreshDevices() async {
     try {
       final discoveredDevices = _physicalDevicesOnly(

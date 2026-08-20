@@ -36,9 +36,44 @@ void main() {
     expect(result.requiresAcknowledgement, isFalse);
     expect(calls.single.method, 'sendMessage');
     expect(calls.single.arguments, <String, Object?>{
-      'deviceId': 'physical:123',
+      'deviceId': '123',
       'message': message.toJson(),
     });
+  });
+
+  test('rejects invalid device ids before native transport', () async {
+    var invocationCount = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (_) async {
+          invocationCount += 1;
+          return null;
+        });
+
+    final gateway = MethodChannelGarminSendGateway(channel: channel);
+    for (final deviceId in <String>[
+      '',
+      'physical:',
+      'physical:watch 123',
+      'physical:physical:123',
+      'emulator:123',
+    ]) {
+      await expectLater(
+        gateway.sendMessage(
+          deviceId: GarminDeviceId(deviceId),
+          message: _message(MessageKind.note, const NotePayload(body: 'Hello')),
+        ),
+        throwsA(
+          isA<GarminSendError>().having(
+            (error) => error.code,
+            'code',
+            GarminSendErrorCode.invalidDeviceId,
+          ),
+        ),
+        reason: deviceId,
+      );
+    }
+
+    expect(invocationCount, 0);
   });
 
   test('rejects oversized messages before native transport', () async {
@@ -113,6 +148,108 @@ void main() {
       expect((mapped as ContractError).code, ContractErrorCode.payloadTooLarge);
     },
   );
+
+  test('maps every native transport failure to a typed Dart error', () {
+    final expectedCodes = <String, GarminSendErrorCode>{
+      'sdkUnavailable': GarminSendErrorCode.sdkUnavailable,
+      'deviceUnavailable': GarminSendErrorCode.deviceUnavailable,
+      'appNotInstalled': GarminSendErrorCode.appNotInstalled,
+      'transportTimeout': GarminSendErrorCode.transportTimeout,
+      'unsupportedPlatform': GarminSendErrorCode.unsupportedPlatform,
+      'nativeFailure': GarminSendErrorCode.nativeFailure,
+      'unexpectedNativeCode': GarminSendErrorCode.nativeFailure,
+    };
+
+    for (final entry in expectedCodes.entries) {
+      final mapped = mapGarminSendPlatformException(
+        PlatformException(code: entry.key, message: 'native detail'),
+      );
+
+      expect(mapped, isA<GarminSendError>());
+      final sendError = mapped as GarminSendError;
+      expect(sendError.code, entry.value, reason: entry.key);
+      expect(sendError.message, 'native detail');
+    }
+  });
+
+  test('maps every native too-large spelling to the contract budget error', () {
+    for (final code in <String>[
+      'payloadTooLarge',
+      'BLE_REQUEST_TOO_LARGE',
+      'bleRequestTooLarge',
+    ]) {
+      final mapped = mapGarminSendPlatformException(
+        PlatformException(code: code),
+      );
+
+      expect(mapped, isA<ContractError>(), reason: code);
+      expect(
+        (mapped as ContractError).code,
+        ContractErrorCode.payloadTooLarge,
+        reason: code,
+      );
+    }
+  });
+
+  test(
+    'surfaces platform failure and completes the send future once',
+    () async {
+      var invocationCount = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (_) async {
+            invocationCount += 1;
+            throw PlatformException(
+              code: 'deviceUnavailable',
+              message: 'Watch disconnected.',
+            );
+          });
+
+      final gateway = MethodChannelGarminSendGateway(channel: channel);
+      await expectLater(
+        gateway.sendMessage(
+          deviceId: const GarminDeviceId('physical:123'),
+          message: _message(
+            MessageKind.point,
+            const PointPayload(
+              intent: PointIntent.navigate,
+              latitude: 52.52,
+              longitude: 13.405,
+            ),
+          ),
+        ),
+        throwsA(
+          isA<GarminSendError>()
+              .having(
+                (error) => error.code,
+                'code',
+                GarminSendErrorCode.deviceUnavailable,
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                'Watch disconnected.',
+              ),
+        ),
+      );
+      expect(invocationCount, 1);
+    },
+  );
+
+  test('unsupported gateway returns its typed failure', () async {
+    await expectLater(
+      const UnsupportedGarminSendGateway().sendMessage(
+        deviceId: const GarminDeviceId('physical:123'),
+        message: _message(MessageKind.note, const NotePayload(body: 'Hello')),
+      ),
+      throwsA(
+        isA<GarminSendError>().having(
+          (error) => error.code,
+          'code',
+          GarminSendErrorCode.unsupportedPlatform,
+        ),
+      ),
+    );
+  });
 }
 
 MessageEnvelope _message(MessageKind kind, ContractPayload payload) {

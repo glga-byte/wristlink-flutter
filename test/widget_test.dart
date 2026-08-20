@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wristlink_flutter/app/wristlink_app.dart';
+import 'package:wristlink_flutter/app/wristlink_app_composition.dart';
 import 'package:wristlink_flutter/features/devices/data/device_settings_store.dart';
 import 'package:wristlink_flutter/features/devices/data/in_memory_device_settings_store.dart';
 import 'package:wristlink_flutter/features/garmin_bridge/garmin_device_discovery_gateway.dart';
+import 'package:wristlink_flutter/features/send_point/data/point_draft_parser.dart';
+import 'package:wristlink_flutter/features/send_point/data/shared_point_parser.dart';
+
+import 'support/send_point_ui_fakes.dart';
 
 void main() {
   const garminDevicesChannel = MethodChannel('wristlink/garmin_devices');
@@ -22,6 +27,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(_testApp());
+    await tester.pumpAndSettle();
 
     expect(find.text('Send'), findsOneWidget);
     expect(find.text('Queue'), findsOneWidget);
@@ -52,22 +58,18 @@ void main() {
 
   testWidgets('switches between primary tab destinations', (tester) async {
     await tester.pumpWidget(_testApp());
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Queue'));
     await tester.pumpAndSettle();
 
     expect(find.text('ALL PROGRESS'), findsOneWidget);
-    expect(find.text('2'), findsOneWidget);
-    expect(find.text('7'), findsOneWidget);
-    expect(find.text('1'), findsOneWidget);
-    expect(find.text('queued'), findsNWidgets(2));
-    expect(find.text('sending'), findsOneWidget);
-    expect(find.text('failed'), findsNWidgets(2));
-    expect(find.text('delivered'), findsOneWidget);
-    expect(find.text('Trailhead parking'), findsOneWidget);
-    expect(find.text('Coffee meet point'), findsOneWidget);
-    expect(find.text('Home note'), findsOneWidget);
-    expect(find.text('Gym timer'), findsOneWidget);
+    expect(find.text('0'), findsNWidgets(3));
+    expect(find.text('queued'), findsOneWidget);
+    expect(find.text('sent'), findsOneWidget);
+    expect(find.text('failed'), findsOneWidget);
+    expect(find.text('Nothing in the queue'), findsOneWidget);
+    expect(find.text('Trailhead parking'), findsNothing);
 
     await tester.tap(find.text('Devices'));
     await tester.pumpAndSettle();
@@ -102,6 +104,9 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(garminDevicesChannel, (call) async {
           calls.add(call.method);
+          if (call.method == 'hydrateTransport') {
+            return const <Object?>[];
+          }
           return [
             {
               'id': 'native-test-watch',
@@ -115,6 +120,7 @@ void main() {
     await tester.pumpWidget(
       _testApp(discoveryGateway: MethodChannelGarminDeviceDiscoveryGateway()),
     );
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Devices'));
     await tester.pumpAndSettle();
@@ -122,7 +128,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
-    expect(calls, ['discoverDevices']);
+    expect(calls, ['hydrateTransport', 'discoverDevices']);
     expect(find.text('Native Test Watch'), findsOneWidget);
     expect(find.text('connected'), findsOneWidget);
   });
@@ -159,5 +165,12 @@ Widget _testApp({
   return WristLinkApp(
     deviceSettingsStore: deviceSettingsStore ?? InMemoryDeviceSettingsStore(),
     discoveryGateway: discoveryGateway,
+    dependencies: WristLinkAppDependencies(
+      sendQueueRepositoryFactory: () async => MemorySendQueueRepository(),
+      sharedPointParser: const SharedPointParser(
+        directParser: PointDraftParser(),
+        shortLinkResolver: FixedShortLinkResolver(),
+      ),
+    ),
   );
 }

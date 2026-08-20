@@ -84,4 +84,6 @@ abstract interface class DeviceDirectory {
 }
 
 abstract interface class DeviceDirectoryController
-    implements DeviceDirectory, Listenable {}
+    implements DeviceDirectory, Listenable {
+  Future<DeviceRefreshResult> hydrateTransport();
+}

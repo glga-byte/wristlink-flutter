@@ -253,7 +253,108 @@ void main() {
       expect(directory.defaultDeviceId, fixtureReadyDevice.id);
       expect(await store.readDefaultDeviceId(), fixtureReadyDevice.id);
     });
+
+    test(
+      'keeps persisted devices known but non-ready until hydration completes',
+      () async {
+        final gateway = _ControllableHydrationGateway();
+        final directory = LocalDeviceDirectory(
+          store: InMemoryDeviceSettingsStore(
+            defaultDeviceId: fixtureReadyDevice.id,
+            authorizedDevices: const [fixtureReadyDevice],
+          ),
+          discoveryGateway: gateway,
+        );
+        await directory.load();
+
+        final hydration = directory.hydrateTransport();
+
+        expect(directory.devices.single.id, fixtureReadyDevice.id);
+        expect(
+          directory.devices.single.reachability,
+          DeviceReachability.unknown,
+        );
+        expect(directory.resolveSendTarget(), isA<SendTargetUnavailable>());
+
+        gateway.complete(const [fixtureReadyDevice]);
+        expect(await hydration, isA<DeviceRefreshSuccess>());
+        expect(directory.resolveSendTarget(), isA<SendTargetReady>());
+      },
+    );
+
+    test(
+      'unavailable hydration leaves persisted work non-send-ready',
+      () async {
+        final store = InMemoryDeviceSettingsStore(
+          defaultDeviceId: fixtureReadyDevice.id,
+          authorizedDevices: const [fixtureReadyDevice],
+        );
+        final directory = LocalDeviceDirectory(
+          store: store,
+          discoveryGateway: const _UnavailableHydrationGateway(),
+        );
+        await directory.load();
+
+        final result = await directory.hydrateTransport();
+
+        expect(
+          result,
+          isA<DeviceRefreshFailure>().having(
+            (failure) => failure.error.code,
+            'code',
+            GarminDiscoveryErrorCode.sdkUnavailable,
+          ),
+        );
+        expect(directory.devices.single.id, fixtureReadyDevice.id);
+        expect(
+          directory.devices.single.reachability,
+          DeviceReachability.unknown,
+        );
+        expect(directory.resolveSendTarget(), isA<SendTargetUnavailable>());
+        expect(
+          (await store.readAuthorizedDevices()).single.reachability,
+          DeviceReachability.reachable,
+        );
+      },
+    );
   });
+}
+
+class _ControllableHydrationGateway implements GarminDeviceDiscoveryGateway {
+  final _hydration = Completer<List<GarminDevice>>();
+
+  @override
+  Stream<GarminDevice> get deviceUpdates => const Stream<GarminDevice>.empty();
+
+  @override
+  Future<List<GarminDevice>> discoverDevices() async => const [];
+
+  @override
+  Future<List<GarminDevice>> hydrateTransport(
+    List<GarminDevice> authorizedDevices,
+  ) => _hydration.future;
+
+  void complete(List<GarminDevice> devices) => _hydration.complete(devices);
+}
+
+class _UnavailableHydrationGateway implements GarminDeviceDiscoveryGateway {
+  const _UnavailableHydrationGateway();
+
+  @override
+  Stream<GarminDevice> get deviceUpdates => const Stream<GarminDevice>.empty();
+
+  @override
+  Future<List<GarminDevice>> discoverDevices() async => const [];
+
+  @override
+  Future<List<GarminDevice>> hydrateTransport(
+    List<GarminDevice> authorizedDevices,
+  ) async {
+    throw const GarminDiscoveryError(
+      GarminDiscoveryErrorCode.sdkUnavailable,
+      'Transport unavailable',
+    );
+  }
 }
 
 class _SequenceGateway implements GarminDeviceDiscoveryGateway {
@@ -273,6 +374,11 @@ class _SequenceGateway implements GarminDeviceDiscoveryGateway {
     }
     return result as List<GarminDevice>;
   }
+
+  @override
+  Future<List<GarminDevice>> hydrateTransport(
+    List<GarminDevice> authorizedDevices,
+  ) async => authorizedDevices;
 }
 
 class _CountingGateway implements GarminDeviceDiscoveryGateway {
@@ -289,6 +395,11 @@ class _CountingGateway implements GarminDeviceDiscoveryGateway {
     discoveryCallCount += 1;
     return devices;
   }
+
+  @override
+  Future<List<GarminDevice>> hydrateTransport(
+    List<GarminDevice> authorizedDevices,
+  ) async => authorizedDevices;
 }
 
 class _UnexpectedErrorGateway implements GarminDeviceDiscoveryGateway {
@@ -301,6 +412,11 @@ class _UnexpectedErrorGateway implements GarminDeviceDiscoveryGateway {
   Future<List<GarminDevice>> discoverDevices() async {
     throw StateError('stuck native refresh');
   }
+
+  @override
+  Future<List<GarminDevice>> hydrateTransport(
+    List<GarminDevice> authorizedDevices,
+  ) async => authorizedDevices;
 }
 
 class _EventGateway implements GarminDeviceDiscoveryGateway {
@@ -313,6 +429,11 @@ class _EventGateway implements GarminDeviceDiscoveryGateway {
   Future<List<GarminDevice>> discoverDevices() async {
     return const <GarminDevice>[];
   }
+
+  @override
+  Future<List<GarminDevice>> hydrateTransport(
+    List<GarminDevice> authorizedDevices,
+  ) async => authorizedDevices;
 
   void add(GarminDevice device) {
     _controller.add(device);

@@ -4,9 +4,14 @@ import '../devices/domain/device_directory.dart';
 import '../devices/presentation/device_presentation_models.dart';
 
 class SendScreen extends StatelessWidget {
-  const SendScreen({required this.deviceDirectory, super.key});
+  const SendScreen({
+    required this.deviceDirectory,
+    this.onManualPoint = _noop,
+    super.key,
+  });
 
   final DeviceDirectoryController deviceDirectory;
+  final VoidCallback onManualPoint;
 
   static const _sendActions = <_SendActionData>[
     _SendActionData(
@@ -72,7 +77,11 @@ class SendScreen extends StatelessWidget {
               _SharePlaceCard(readiness: readiness),
               const SizedBox(height: 24),
               const Divider(height: 1),
-              for (final action in _sendActions) _SendActionRow(data: action),
+              for (final action in _sendActions)
+                _SendActionRow(
+                  data: action,
+                  onTap: action.title == 'Manual point' ? onManualPoint : null,
+                ),
             ],
           ),
         );
@@ -80,6 +89,8 @@ class SendScreen extends StatelessWidget {
     );
   }
 }
+
+void _noop() {}
 
 class _SharePlaceCard extends StatelessWidget {
   const _SharePlaceCard({required this.readiness});
@@ -186,65 +197,76 @@ class _ReadinessLine extends StatelessWidget {
 }
 
 class _SendActionRow extends StatelessWidget {
-  const _SendActionRow({required this.data});
+  const _SendActionRow({required this.data, this.onTap});
 
   final _SendActionData data;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Row(
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: data.outlined ? Colors.transparent : data.color,
-                  borderRadius: BorderRadius.circular(data.outlined ? 18 : 8),
-                  border: data.outlined
-                      ? Border.all(color: data.color, width: 3)
-                      : null,
-                ),
-                child: SizedBox.square(
-                  dimension: 36,
-                  child: Icon(
-                    data.icon,
-                    color:
-                        data.outlined || data.color == const Color(0xFFFFCF33)
-                        ? const Color(0xFF111111)
-                        : Colors.white,
-                    size: 20,
+    return Semantics(
+      button: onTap != null,
+      enabled: onTap != null,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Row(
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: data.outlined ? Colors.transparent : data.color,
+                      borderRadius: BorderRadius.circular(
+                        data.outlined ? 18 : 8,
+                      ),
+                      border: data.outlined
+                          ? Border.all(color: data.color, width: 3)
+                          : null,
+                    ),
+                    child: SizedBox.square(
+                      dimension: 36,
+                      child: Icon(
+                        data.icon,
+                        color:
+                            data.outlined ||
+                                data.color == const Color(0xFFFFCF33)
+                            ? const Color(0xFF111111)
+                            : Colors.white,
+                        size: 20,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      data.title,
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          data.title,
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          data.description,
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: const Color(0xFF6F6F69),
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      data.description,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF6F6F69),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            const Divider(height: 1),
+          ],
         ),
-        const Divider(height: 1),
-      ],
+      ),
     );
   }
 }

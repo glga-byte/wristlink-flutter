@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <application
         android:label="wristlink_flutter"
         android:name="${applicationName}"
@@ -24,6 +26,11 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
@@ -33,6 +40,9 @@
         <meta-data
             android:name="com.wristlink.CONNECT_IQ_APP_ID"
             android:value="${WRISTLINK_CONNECT_IQ_APP_UUID}" />
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${WRISTLINK_GOOGLE_MAPS_API_KEY}" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

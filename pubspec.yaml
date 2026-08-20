@@ -30,6 +30,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  geolocator: 14.0.2
+  google_maps_flutter: 2.18.0
+  http: 1.5.0
+  path: 1.9.1
+  sqflite: 2.4.2
+  ulid: 2.0.1
+  workmanager: 0.9.0+3
+  wristlink_engine_bridge:
+    path: packages/wristlink_engine_bridge
 
 dev_dependencies:
   flutter_test:
@@ -41,6 +50,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  sqflite_common_ffi: 2.4.0+3
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

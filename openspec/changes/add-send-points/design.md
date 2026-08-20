@@ -4,6 +4,8 @@ See `proposal.md` for motivation and `specs/send-point/spec.md`, `specs/send-que
 
 The native Garmin bridges currently retain SDK/device objects discovered during the app session. Send and acknowledgement adapters must extend that transport boundary without reconstructing payload business rules natively. The iOS app currently supports iOS 13 and has dev/prod bundle ids and Garmin callback schemes; a Share Extension and current Google Maps Flutter plugin require new flavor-specific identifiers, entitlements, and a higher deployment baseline.
 
+Review of the completed transport path found two boundary assumptions that must be made explicit. Dart prefixes every physical device id with `physical:` for stable domain and storage identity, while the native Garmin SDK caches are keyed by the raw Android numeric id or iOS UUID. In addition, persisted Dart device snapshots survive a process restart while the native SDK-owned device/app objects do not. A send must therefore translate the target id at the typed channel boundary and must not treat persisted reachability as current transport readiness until the native cache has been rehydrated.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -12,6 +14,7 @@ The native Garmin bridges currently retain SDK/device objects discovered during 
 - Give Android and iOS one typed inbound-share boundary even though their OS lifecycles differ.
 - Persist a point before its first transport attempt and expose one queue record as the source of truth for confirmation outcomes, status screens, and the Queue tab.
 - Make foreground and platform-granted background attempts use the same delivery coordinator and transition rules.
+- Keep persisted physical-device identity stable in Dart while making raw native-id conversion and transport-cache hydration explicit, typed bridge responsibilities.
 - Match the Paper layouts while using Material behavior on Android and iOS-native navigation, sheets, controls, and motion on iOS.
 
 **Non-Goals:**
@@ -48,7 +51,7 @@ App Group entitlements must be identical between each app flavor and matching ex
 
 ### Parse in deterministic stages and restrict network resolution
 
-Implement a pure Dart parser with fixtures for observed Google Maps share formats. Parsing runs in this order: extract candidate URI(s), parse `geo:` coordinates, parse direct Google Maps URL path/query/`@lat,lon` forms, then parse an unambiguous coordinate pair from plain text. Candidate coordinates must be finite and within contract ranges. Labels may be decoded from supported path/query fields or surrounding shared text, then remain editable.
+Implement a pure Dart parser with fixtures for observed Google Maps share formats. Parsing runs in this order: extract candidate URI(s), parse `geo:` coordinates, parse direct Google Maps URL path/query/`@lat,lon` forms and selected-place `!3d<latitude>!4d<longitude>` data segments, then parse an unambiguous coordinate pair from plain text. Data-segment parsing accepts exactly one distinct adjacent latitude/longitude pair and rejects malformed, ambiguous, or out-of-range candidates rather than guessing. Candidate coordinates must be finite and within contract ranges. Labels come from Dart's already-decoded URI path/query accessors or surrounding shared text; label normalization replaces Google Maps `+` separators without percent-decoding a second time, so Unicode and literal percent characters remain valid and cannot escape as parser exceptions. Labels remain editable.
 
 Only allowlisted Google short-link hosts (`maps.app.goo.gl` and `goo.gl/maps`) may trigger network access. A resolver uses a streamed HTTP request, HTTPS-only redirects, an allowlisted Google Maps destination, a small redirect limit, and short connect/overall timeouts without consuming response bodies. Original shared text is capped before persistence and retained locally only until ingress acknowledgement; a parse failure keeps the bounded text in point-flow state for copy/manual recovery.
 
@@ -87,11 +90,29 @@ Use the Flutter `workmanager` integration behind a dedicated `BackgroundSendSche
 
 Native-only delivery orchestration was rejected because it would duplicate queue policy and contract decisions outside Dart. Foreground-only retry was rejected because the designed queued outcome promises background attempts when the platform permits them.
 
+### Separate canonical Dart device ids from raw native transport ids
+
+Keep `GarminDeviceId` values canonical inside Dart and durable storage as `physical:<raw-native-id>`. The typed Dart Garmin send gateway validates that a target is a physical id, removes exactly one `physical:` prefix, and sends only the non-empty raw id over `wristlink/garmin_send`. Android continues to resolve that raw value as the SDK's numeric device identifier, and iOS continues to resolve it as the SDK UUID. Native caches are not re-keyed with Dart domain prefixes.
+
+This conversion belongs at the typed Dart bridge boundary rather than in UI, queue, or native lookup code. Discovery mapping and outbound mapping use one tested codec so a raw id returned by native discovery round-trips back to the same native device. Invalid or non-physical ids fail as typed Dart bridge errors before platform invocation. Shared fixtures cover an Android numeric id and an iOS UUID across discovery mapping, durable identity, outbound channel arguments, and native cache lookup.
+
+Sending canonical ids unchanged was rejected because it couples a Dart namespace prefix to SDK-specific native lookup formats and makes every real physical-device lookup fail.
+
+### Rehydrate transport-owned device state before startup drains
+
+Treat device settings as the persisted authorization snapshot, not proof that the current process can send. After `LocalDeviceDirectory` loads the latest authorized devices, foreground and background composition must re-establish the platform SDK/device/app cache before the delivery service runs its startup drain. Until hydration returns current status, restored devices remain known targets but are not considered send-ready; failed or unavailable hydration leaves their records pending for a later foreground, device-readiness, or background trigger.
+
+Android hydration initializes the Connect IQ SDK, queries its current known devices and companion apps without user interaction, and applies the resulting live device maps through the existing typed discovery gateway. iOS hydration must not launch Garmin Connect Mobile. Dart maps the already persisted authorized-device metadata into a typed restore request; the native bridge reconstructs `IQDevice` transport objects from the UUID, model name, friendly name, and part number already returned by discovery, registers device events, rebuilds `IQApp` ownership, and queries current app/device state. The latest authorized list remains owned and JSON-mapped by Dart through `DeviceSettingsStore`; iOS does not introduce a second independently authoritative device list.
+
+The same hydration path is shared by foreground and headless composition. It is idempotent per native bridge owner and completes before any eligible record is claimed. A cold-process test starts with a persisted ready snapshot and queued record, proves that native restoration happens first, and verifies that the subsequent send uses the raw platform id without visiting the Devices screen.
+
+Starting the drain from stale persisted reachability was rejected because it converts a healthy queued record into avoidable SDK/device-unavailable backoff and can leave immediate submission dependent on a later manual refresh.
+
 ### Extend the Garmin bridge as one transport owner per platform
 
 The existing native Garmin device bridge already owns SDK initialization and the authorized native device objects needed for sending. Extend that platform transport component to register:
 
-- the existing `wristlink/garmin_send` method call, accepting only a target id and normalized contract map;
+- the existing `wristlink/garmin_send` method call, accepting only a raw platform target id and normalized contract map;
 - a `wristlink/garmin_acknowledgements` event channel emitting raw app-message maps from registered target/app callbacks; and
 - lifecycle-safe SDK/device/app registration usable by foreground and headless engines without duplicating event registrations.
 
@@ -111,6 +132,8 @@ UI reads immutable presentation models derived from `PointDraft`, `DeviceDirecto
 - [App Group, callback scheme, extension bundle id, or signing entitlements diverge by flavor] → Derive them from one flavor configuration contract and add project-file/configuration tests for dev and prod.
 - [Adding the maintained map plugin drops iOS 13] → Mark the deployment change as breaking, raise every target/configuration consistently, and verify both flavor builds before release.
 - [A headless background engine lacks a required plugin or Garmin SDK state] → Add background composition tests where possible, platform instrumentation coverage, idempotent bridge registration, and foreground fallback; treat background timing as best effort.
+- [Persisted device reachability is stale after process restart] → Mark restored snapshots non-send-ready until platform hydration completes, hydrate before startup drains, and retain pending work when hydration is unavailable.
+- [Dart and native device-id formats drift] → Keep one typed canonical-to-raw codec with Android numeric and iOS UUID round-trip fixtures spanning discovery, send-channel serialization, and native lookup.
 - [The process dies after transport but before acknowledgement] → Keep the stable message id, wait a bounded recovery period, then require explicit retry with an unknown-delivery warning rather than automatically duplicating the command.
 - [SQLite schema or a record becomes corrupt] → Version migrations transactionally, reject malformed envelopes into a diagnosable failed state, and preserve unaffected rows.
 - [Native Garmin acknowledgements arrive more than once or out of order] → Correlate and transition idempotently in Dart; unknown/late acknowledgements must not regress terminal records.
@@ -124,5 +147,6 @@ UI reads immutable presentation models derived from `PointDraft`, `DeviceDirecto
 4. Add map picker and point confirmation using fake send services, then wire durable enqueue and queue-backed UI.
 5. Implement native Garmin send and acknowledgement transport, foreground delivery, and finally background scheduling/entrypoint composition.
 6. Replace static Queue examples and activate point actions only after restoration, failure, and flavor build checks pass.
+7. Before merge, correct the canonical/raw device-id boundary, hydrate foreground and background native transport state before startup drains, and commit the application dependency lockfiles.
 
 Rollback removes share registrations and disables point entry actions first. Keep the queue database readable for at least one rollback version so already queued points can be surfaced or exported rather than silently discarded; do not downgrade stored schema destructively. Roll back iOS 14 only if all iOS-14-only dependencies, extension settings, and built artifacts are removed together.
