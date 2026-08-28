@@ -4,10 +4,10 @@ import 'dart:io';
 import 'package:workmanager/workmanager.dart';
 
 import '../../../app/platform/device_settings_store_provider.dart';
+import '../../../app/platform/garmin_device_discovery_gateway_provider.dart';
 import '../../../app/platform/send_queue_repository_provider.dart';
 import '../../devices/data/local_device_directory.dart';
 import '../../garmin_bridge/garmin_acknowledgement_gateway.dart';
-import '../../garmin_bridge/garmin_device_discovery_gateway.dart';
 import '../../garmin_bridge/garmin_send_gateway.dart';
 import '../application/send_queue_delivery_coordinator.dart';
 import '../data/send_queue_repository.dart';
@@ -88,9 +88,7 @@ Future<BackgroundSendComposition> createBackgroundSendComposition() async {
   final repository = await createSendQueueRepository();
   final deviceDirectory = LocalDeviceDirectory(
     store: createDeviceSettingsStore(),
-    discoveryGateway: Platform.isAndroid
-        ? MethodChannelGarminDeviceDiscoveryGateway()
-        : const UnsupportedGarminDeviceDiscoveryGateway(),
+    discoveryGateway: createGarminDeviceDiscoveryGateway(),
   );
   try {
     await deviceDirectory.load();

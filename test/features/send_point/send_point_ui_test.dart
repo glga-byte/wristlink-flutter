@@ -22,6 +22,7 @@ import 'package:wristlink_flutter/features/send_point/presentation/point_confirm
 import 'package:wristlink_flutter/features/send_point/presentation/point_parse_recovery_screen.dart';
 import 'package:wristlink_flutter/features/send_point/presentation/point_status_screen.dart';
 import 'package:wristlink_flutter/features/send_point/share/shared_content_gateway.dart';
+import 'package:wristlink_flutter/features/send_queue/data/send_queue_repository.dart';
 import 'package:wristlink_flutter/features/send_queue/domain/send_queue_record.dart';
 import 'package:wristlink_flutter/features/send_queue/presentation/queue_screen.dart';
 import 'package:wristlink_flutter/features/send_queue/presentation/send_queue_controller.dart';
@@ -387,6 +388,64 @@ void main() {
     expect(find.text('Point sent'), findsOneWidget);
     directory.dispose();
   });
+
+  testWidgets(
+    'queue surfaces isolated corruption and removes only quarantined data',
+    (tester) async {
+      final repository = MemorySendQueueRepository();
+      final healthy = _record(status: SendQueueStatus.pending);
+      await repository.enqueue(healthy);
+      repository.addDiagnostic(
+        const QueueStorageDiagnostic(
+          id: QueueStorageDiagnosticId(7),
+          recordId: 'corrupted-message-id',
+          message: 'A corrupted queue item was isolated.',
+        ),
+      );
+      final controller = SendQueueController(repository);
+      await controller.initialize();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: QueueScreen(controller: controller, onRecordTap: (_) {}),
+        ),
+      );
+
+      expect(find.text('Queue storage issue'), findsOneWidget);
+      expect(
+        find.text(
+          '1 corrupted item was isolated and won’t be sent. Your other queue items are still available.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Trailhead parking'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(
+          RegExp(
+            'Queue storage issue. One corrupted item was isolated and will not be sent.',
+          ),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Remove corrupted item'));
+      await tester.pumpAndSettle();
+      expect(find.text('Remove corrupted data?'), findsOneWidget);
+      expect(
+        find.text(
+          'This permanently removes the isolated queue item. Other queue items are not affected.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Remove'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Queue storage issue'), findsNothing);
+      expect(find.text('Trailhead parking'), findsOneWidget);
+      expect(controller.storageDiagnostics, isEmpty);
+      expect(controller.records.single.id, healthy.id);
+    },
+  );
 
   testWidgets('failed status exposes typed setup and retry recovery actions', (
     tester,

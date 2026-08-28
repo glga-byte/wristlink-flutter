@@ -18,12 +18,16 @@ class SendQueueController extends ChangeNotifier {
 
   final SendQueueRepository _repository;
   List<SendQueueRecord> _records = const [];
+  List<QueueStorageDiagnostic> _storageDiagnostics = const [];
   QueueStorageException? _storageError;
   var _isInitialized = false;
+  var _isRemovingQuarantinedRows = false;
 
   List<SendQueueRecord> get records => _records;
+  List<QueueStorageDiagnostic> get storageDiagnostics => _storageDiagnostics;
   QueueStorageException? get storageError => _storageError;
   bool get isInitialized => _isInitialized;
+  bool get isRemovingQuarantinedRows => _isRemovingQuarantinedRows;
 
   Future<void> initialize() async {
     try {
@@ -52,12 +56,32 @@ class SendQueueController extends ChangeNotifier {
   Future<void> refresh() async {
     try {
       _records = List.unmodifiable(await _repository.readAll());
+      _storageDiagnostics = List.unmodifiable(_repository.diagnostics);
       _storageError = null;
       notifyListeners();
     } on QueueStorageException catch (error) {
       _storageError = error;
       notifyListeners();
       rethrow;
+    }
+  }
+
+  Future<void> removeQuarantinedRows() async {
+    if (_storageDiagnostics.isEmpty || _isRemovingQuarantinedRows) return;
+    _isRemovingQuarantinedRows = true;
+    notifyListeners();
+    try {
+      await _repository.removeQuarantinedRows(
+        _storageDiagnostics.map((diagnostic) => diagnostic.id).toSet(),
+      );
+      await refresh();
+    } on QueueStorageException catch (error) {
+      _storageError = error;
+      notifyListeners();
+      rethrow;
+    } finally {
+      _isRemovingQuarantinedRows = false;
+      notifyListeners();
     }
   }
 

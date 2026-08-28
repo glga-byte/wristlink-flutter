@@ -33,6 +33,7 @@ void main() {
 
     expect(infoPlist, contains('BGTaskSchedulerPermittedIdentifiers'));
     expect(infoPlist, contains(identifier));
+    expect(infoPlist, contains('<string>bluetooth-central</string>'));
     expect(infoPlist, contains('<string>fetch</string>'));
     expect(
       appDelegate,

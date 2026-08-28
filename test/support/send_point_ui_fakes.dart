@@ -7,10 +7,12 @@ import 'package:wristlink_flutter/features/send_queue/domain/send_queue_record.d
 
 class MemorySendQueueRepository implements SendQueueRepository {
   final Map<String, SendQueueRecord> _records = {};
+  final List<QueueStorageDiagnostic> _diagnostics = [];
   var initialized = false;
 
   @override
-  List<QueueStorageDiagnostic> get diagnostics => const [];
+  List<QueueStorageDiagnostic> get diagnostics =>
+      List.unmodifiable(_diagnostics);
 
   @override
   Future<void> initialize() async => initialized = true;
@@ -32,6 +34,15 @@ class MemorySendQueueRepository implements SendQueueRepository {
     final values = _records.values.toList()
       ..sort((left, right) => right.updatedAt.compareTo(left.updatedAt));
     return values;
+  }
+
+  @override
+  Future<void> removeQuarantinedRows(
+    Set<QueueStorageDiagnosticId> diagnosticIds,
+  ) async {
+    _diagnostics.removeWhere(
+      (diagnostic) => diagnosticIds.contains(diagnostic.id),
+    );
   }
 
   @override
@@ -112,6 +123,9 @@ class MemorySendQueueRepository implements SendQueueRepository {
   Future<void> close() async {}
 
   void replace(SendQueueRecord record) => _records[record.id] = record;
+
+  void addDiagnostic(QueueStorageDiagnostic diagnostic) =>
+      _diagnostics.add(diagnostic);
 }
 
 class FakePointQueueActions implements PointQueueActions {

@@ -60,6 +60,43 @@ void main() {
     },
   );
 
+  test('schema version 1 upgrades with durable quarantine storage', () async {
+    await repository.close();
+    await databaseFactoryFfi.deleteDatabase(databasePath);
+    final legacy = await databaseFactoryFfi.openDatabase(
+      databasePath,
+      options: OpenDatabaseOptions(
+        version: 1,
+        onCreate: (database, version) async {
+          await database.execute(
+            'CREATE TABLE send_queue (message_id TEXT PRIMARY KEY)',
+          );
+        },
+      ),
+    );
+    await legacy.close();
+
+    repository = SqliteSendQueueRepository(
+      path: databasePath,
+      databaseFactory: databaseFactoryFfi,
+    );
+    await repository.initialize();
+
+    final verify = await databaseFactoryFfi.openDatabase(
+      databasePath,
+      options: OpenDatabaseOptions(singleInstance: false),
+    );
+    final tables = await verify.query(
+      'sqlite_master',
+      columns: ['name'],
+      where: "type = 'table' AND name = ?",
+      whereArgs: ['send_queue_quarantine'],
+    );
+    expect(tables, hasLength(1));
+    expect(repository.diagnostics, isEmpty);
+    await verify.close();
+  });
+
   test('unique ids and guarded transitions are enforced', () async {
     final record = _pending(
       '01HX7Y8Z9ABCDEFGHJKMNPQS6X',
@@ -149,16 +186,121 @@ void main() {
         first.id,
       ]);
 
-      final raw = await databaseFactoryFfi.openDatabase(databasePath);
+      final raw = await databaseFactoryFfi.openDatabase(
+        databasePath,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
       await raw.update(
         'send_queue',
         {'envelope_json': '{broken'},
         where: 'message_id = ?',
         whereArgs: [first.id],
       );
+      await raw.close();
       final records = await repository.readAll();
       expect(records.map((record) => record.id), [second.id]);
-      expect(repository.diagnostics.single.recordId, first.id);
+      final diagnostic = repository.diagnostics.single;
+      expect(diagnostic.id.value, greaterThan(0));
+      expect(diagnostic.recordId, first.id);
+      expect(diagnostic.message, contains('isolated'));
+    },
+  );
+
+  test(
+    'corrupted rows are quarantined before claims and healthy work remains eligible',
+    () async {
+      final corrupt = _pending(
+        '01HX7Y8Z9ABCDEFGHJKMNPQS6X',
+        DateTime.utc(2026, 8, 20, 9),
+      );
+      final healthy = _pending(
+        '01HX7Y8Z9ABCDEFGHJKMNPQS7X',
+        DateTime.utc(2026, 8, 20, 10),
+      );
+      await repository.enqueue(corrupt);
+      await repository.enqueue(healthy);
+      final raw = await databaseFactoryFfi.openDatabase(
+        databasePath,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await raw.update(
+        'send_queue',
+        {'envelope_json': '{broken'},
+        where: 'message_id = ?',
+        whereArgs: [corrupt.id],
+      );
+      await raw.close();
+
+      final claimed = await repository.claimNextEligible(
+        DateTime.utc(2026, 8, 20, 11),
+      );
+
+      expect(claimed?.id, healthy.id);
+      expect(claimed?.status, SendQueueStatus.sending);
+      expect(await repository.findById(corrupt.id), isNull);
+      expect(repository.diagnostics.single.recordId, corrupt.id);
+      expect((await repository.readAll()).map((record) => record.id), [
+        healthy.id,
+      ]);
+    },
+  );
+
+  test(
+    'controller keeps quarantine diagnostics until explicit removal',
+    () async {
+      final corrupt = _pending(
+        '01HX7Y8Z9ABCDEFGHJKMNPQS6X',
+        DateTime.utc(2026, 8, 20, 9),
+      );
+      final healthy = _pending(
+        '01HX7Y8Z9ABCDEFGHJKMNPQS7X',
+        DateTime.utc(2026, 8, 20, 10),
+      );
+      await repository.enqueue(corrupt);
+      await repository.enqueue(healthy);
+      final raw = await databaseFactoryFfi.openDatabase(
+        databasePath,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      await raw.update(
+        'send_queue',
+        {'envelope_json': '{broken'},
+        where: 'message_id = ?',
+        whereArgs: [corrupt.id],
+      );
+      await raw.close();
+      await repository.readAll();
+      await repository.close();
+
+      repository = SqliteSendQueueRepository(
+        path: databasePath,
+        databaseFactory: databaseFactoryFfi,
+      );
+      await repository.initialize();
+      expect(repository.diagnostics.single.recordId, corrupt.id);
+
+      final controller = SendQueueController(repository);
+      await controller.initialize();
+      expect(controller.records.single.id, healthy.id);
+      expect(controller.storageDiagnostics.single.recordId, corrupt.id);
+      await controller.refresh();
+      expect(controller.storageDiagnostics, hasLength(1));
+
+      await controller.removeQuarantinedRows();
+
+      expect(controller.storageDiagnostics, isEmpty);
+      expect(controller.records.single.id, healthy.id);
+      expect(repository.diagnostics, isEmpty);
+      final verify = await databaseFactoryFfi.openDatabase(
+        databasePath,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      expect(await verify.query('send_queue_quarantine'), isEmpty);
+      expect(
+        (await verify.query('send_queue')).single['message_id'],
+        healthy.id,
+      );
+      await verify.close();
     },
   );
 
@@ -199,7 +341,7 @@ void main() {
     final newer = await databaseFactoryFfi.openDatabase(
       databasePath,
       options: OpenDatabaseOptions(
-        version: 2,
+        version: SqliteSendQueueRepository.schemaVersion + 1,
         onUpgrade: (database, oldVersion, newVersion) async {
           await database.execute(
             'CREATE TABLE migration_sentinel(value TEXT NOT NULL)',
@@ -220,7 +362,9 @@ void main() {
     );
     final verify = await databaseFactoryFfi.openDatabase(
       databasePath,
-      options: OpenDatabaseOptions(version: 2),
+      options: OpenDatabaseOptions(
+        version: SqliteSendQueueRepository.schemaVersion + 1,
+      ),
     );
     expect(
       (await verify.query('migration_sentinel')).single['value'],

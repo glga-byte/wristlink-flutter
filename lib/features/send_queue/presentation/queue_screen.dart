@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../payloads/message_contract.dart';
+import '../data/send_queue_repository.dart';
 import '../domain/send_queue_record.dart';
 import 'send_queue_controller.dart';
 
@@ -85,10 +86,21 @@ class QueueScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 const Divider(height: 1),
+                if (controller.storageDiagnostics.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  _QueueStorageIssue(
+                    count: controller.storageDiagnostics.length,
+                    isRemoving: controller.isRemovingQuarantinedRows,
+                    onRemove: () =>
+                        _confirmQuarantineRemoval(context, controller),
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(height: 1),
+                ],
                 if (!controller.isInitialized)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 40),
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(child: CircularProgressIndicator.adaptive()),
                   )
                 else if (controller.storageError != null)
                   Padding(
@@ -111,6 +123,112 @@ class QueueScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+Future<void> _confirmQuarantineRemoval(
+  BuildContext context,
+  SendQueueController controller,
+) async {
+  final count = controller.storageDiagnostics.length;
+  final confirmed = await showAdaptiveDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog.adaptive(
+      title: const Text('Remove corrupted data?'),
+      content: Text(
+        count == 1
+            ? 'This permanently removes the isolated queue item. Other queue items are not affected.'
+            : 'This permanently removes the $count isolated queue items. Other queue items are not affected.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Remove'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) {
+    try {
+      await controller.removeQuarantinedRows();
+    } on QueueStorageException {
+      // The controller publishes the storage failure for the queue screen.
+    }
+  }
+}
+
+class _QueueStorageIssue extends StatelessWidget {
+  const _QueueStorageIssue({
+    required this.count,
+    required this.isRemoving,
+    required this.onRemove,
+  });
+
+  final int count;
+  final bool isRemoving;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: count == 1
+          ? 'Queue storage issue. One corrupted item was isolated and will not be sent.'
+          : 'Queue storage issue. $count corrupted items were isolated and will not be sent.',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.errorContainer,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Queue storage issue',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: colorScheme.onErrorContainer,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                count == 1
+                    ? '1 corrupted item was isolated and won’t be sent. Your other queue items are still available.'
+                    : '$count corrupted items were isolated and won’t be sent. Your other queue items are still available.',
+                style: TextStyle(color: colorScheme.onErrorContainer),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: isRemoving ? null : onRemove,
+                icon: isRemoving
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator.adaptive(
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.delete_outline),
+                label: Text(
+                  isRemoving
+                      ? 'Removing…'
+                      : count == 1
+                      ? 'Remove corrupted item'
+                      : 'Remove corrupted items',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

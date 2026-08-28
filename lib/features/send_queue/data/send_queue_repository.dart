@@ -20,10 +20,31 @@ class QueueStorageException implements Exception {
 }
 
 class QueueStorageDiagnostic {
-  const QueueStorageDiagnostic({required this.recordId, required this.message});
+  const QueueStorageDiagnostic({
+    required this.id,
+    required this.recordId,
+    required this.message,
+  });
 
+  final QueueStorageDiagnosticId id;
   final String? recordId;
   final String message;
+}
+
+class QueueStorageDiagnosticId {
+  const QueueStorageDiagnosticId(this.value);
+
+  final int value;
+
+  @override
+  bool operator ==(Object other) =>
+      other is QueueStorageDiagnosticId && other.value == value;
+
+  @override
+  int get hashCode => value.hashCode;
+
+  @override
+  String toString() => 'QueueStorageDiagnosticId($value)';
 }
 
 abstract interface class SendQueueRepository {
@@ -34,6 +55,10 @@ abstract interface class SendQueueRepository {
   Future<SendQueueRecord> enqueue(SendQueueRecord record);
 
   Future<List<SendQueueRecord>> readAll();
+
+  Future<void> removeQuarantinedRows(
+    Set<QueueStorageDiagnosticId> diagnosticIds,
+  );
 
   Future<SendQueueRecord?> findById(String messageId);
 
@@ -92,6 +117,11 @@ class UnsupportedSendQueueRepository implements SendQueueRepository {
 
   @override
   Future<List<SendQueueRecord>> readAll() async => _unsupported();
+
+  @override
+  Future<void> removeQuarantinedRows(
+    Set<QueueStorageDiagnosticId> diagnosticIds,
+  ) async => _unsupported();
 
   @override
   Future<SendQueueRecord> retryFailed(String messageId, DateTime now) async =>

@@ -19,6 +19,10 @@ The system SHALL persist every submitted point envelope, selected physical devic
 - **WHEN** the queue cannot durably store a point
 - **THEN** the system does not invoke Garmin transport and reports that the point was not queued
 
+#### Scenario: A stored queue row is corrupted
+- **WHEN** the queue restores a row whose stored fields or envelope cannot be decoded safely
+- **THEN** the system quarantines that row, never sends its corrupt data, preserves and exposes all unaffected rows, and surfaces a persistent diagnosable storage issue with explicit recovery or removal
+
 ### Requirement: Stable Physical Target Identity
 The system SHALL store physical watch targets as canonical Dart device ids and SHALL explicitly convert them to the raw platform-specific ids used by the native Garmin SDK at the typed transport boundary.
 
@@ -88,8 +92,12 @@ The system SHALL attempt eligible pending records on submission, app startup or 
 - **THEN** the queue starts one delivery attempt for that record
 
 #### Scenario: Background execution is granted
-- **WHEN** the operating system runs scheduled background work
+- **WHEN** Android or iOS runs scheduled platform-granted background work
 - **THEN** the system loads durable state, attempts eligible pending records, persists outcomes, and requests more work only while retryable records remain
+
+#### Scenario: iOS headless background composition restores transport
+- **WHEN** iOS starts the headless background entrypoint with persisted authorized devices and eligible queue records
+- **THEN** composition uses the supported mobile method-channel Garmin discovery/hydration gateway to rehydrate transport state before claiming or sending a record
 
 #### Scenario: Background execution is delayed
 - **WHEN** the operating system postpones or denies scheduled background work

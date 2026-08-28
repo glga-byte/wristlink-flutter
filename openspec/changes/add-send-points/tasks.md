@@ -90,9 +90,18 @@
 - [x] 11.8 Add narrow `.gitignore` exceptions for `/pubspec.lock` and `/ios/Podfile.lock`, commit both application lockfiles, and confirm package/library-local lockfiles remain ignored where appropriate.
 - [x] 11.9 Run formatting, static analysis, Flutter tests, Android dev/prod native tests, iOS native tests, and dev/prod Android and iOS builds; document that the message contract and adopted contract revision remain unchanged.
 
+## 12. Post-Verification Correctness Follow-up
+
+- [x] 12.1 Capture the post-verification findings in the proposal, send-queue requirements, design decisions, focused follow-up tasks, durable project guidance, and implementation notes.
+- [x] 12.2 Fix the iOS headless background composition to select the supported mobile method-channel Garmin discovery/hydration gateway, and add production-factory regression coverage proving both Android and iOS hydrate before claim/send.
+- [x] 12.3 Surface quarantined or corrupted SQLite queue rows through the queue controller and UI as persistent diagnosable storage issues, provide explicit recovery/removal without hiding unaffected rows, and add repository/controller/widget coverage.
+- [x] 12.4 Rerun proportional full verification: formatting, static analysis, Flutter tests, Android dev/prod native suites, iOS native suites, dev/prod Android and iOS builds, and `openspec validate add-send-points --strict`.
+
 ## Implementation Notes
 
 - The point message contract remains unchanged. This implementation continues to adopt contract submodule revision `0324a3dcaaba9d580723a7e845b312084c6c2343`.
 - Final diff review found no contract-submodule pointer change and no Paper design or snapshot changes.
 - Follow-up verification added connected Android instrumentation for raw-intent persistence, cold/warm lifecycle handling, malformed inputs, acknowledgement cleanup, duplicate suppression, bounds, and non-share launches. iOS host tests now execute the same persistence service used by the Share Extension and verify stopped/running app delivery, callback/resume deduplication, Garmin callback coexistence, and acknowledgement cleanup.
 - Merge-blocking review follow-up does not change the v1 message or acknowledgement contract; it corrects device identity at the transport boundary, restores native process-local transport state before delivery, and makes dependency resolution reproducible.
+- Post-verification artifact updates add no message-contract change and retain adopted contract revision `0324a3dcaaba9d580723a7e845b312084c6c2343`.
+- Final post-verification checks passed formatting, static analysis, all Flutter tests, Android and iOS dev/prod native suites, dev/prod Android and iOS builds, strict OpenSpec validation, and diff-integrity review; the contract revision remains unchanged and no Paper artifacts were modified.

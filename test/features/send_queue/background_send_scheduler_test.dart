@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wristlink_flutter/app/platform/garmin_device_discovery_gateway_provider_io.dart';
 import 'package:wristlink_flutter/features/devices/data/in_memory_device_settings_store.dart';
 import 'package:wristlink_flutter/features/devices/data/local_device_directory.dart';
 import 'package:wristlink_flutter/features/devices/domain/garmin_device.dart';
@@ -16,6 +17,38 @@ import 'package:wristlink_flutter/features/send_queue/data/send_queue_repository
 import 'package:wristlink_flutter/features/send_queue/domain/send_queue_record.dart';
 
 void main() {
+  group('mobile Garmin discovery gateway provider', () {
+    for (final platform in const [
+      (isAndroid: true, isIOS: false),
+      (isAndroid: false, isIOS: true),
+    ]) {
+      test(
+        '${platform.isAndroid ? 'Android' : 'iOS'} selects method-channel hydration',
+        () {
+          final gateway = createGarminDeviceDiscoveryGatewayForPlatform(
+            isAndroid: platform.isAndroid,
+            isIOS: platform.isIOS,
+          );
+
+          expect(gateway, isA<MethodChannelGarminDeviceDiscoveryGateway>());
+          expect(
+            gateway,
+            isNot(isA<UnsupportedGarminDeviceDiscoveryGateway>()),
+          );
+        },
+      );
+    }
+
+    test('reserves the unsupported gateway for non-mobile platforms', () {
+      final gateway = createGarminDeviceDiscoveryGatewayForPlatform(
+        isAndroid: false,
+        isIOS: false,
+      );
+
+      expect(gateway, isA<UnsupportedGarminDeviceDiscoveryGateway>());
+    });
+  });
+
   group('WorkmanagerBackgroundSendScheduler', () {
     test(
       'uses replaceable one-off Android work and cancels when empty',
@@ -132,19 +165,31 @@ void main() {
         '${platform.name} sends ready durable work when execution is granted',
         () async {
           final now = DateTime.now().toUtc();
+          final events = <String>[];
           final repository = _SingleRecordRepository(
             _record(now, device: _readyDevice),
+            events: events,
           );
+          final discoveryGateway =
+              createGarminDeviceDiscoveryGatewayForPlatform(
+                isAndroid: platform == BackgroundSendPlatform.android,
+                isIOS: platform == BackgroundSendPlatform.ios,
+                mobileGatewayFactory: () => _RestoringDiscoveryGateway(events),
+              );
           final directory = LocalDeviceDirectory(
             store: InMemoryDeviceSettingsStore(
               defaultDeviceId: _readyDevice.id,
               authorizedDevices: const [_readyDevice],
             ),
-            discoveryGateway: const _RestoringDiscoveryGateway(),
+            discoveryGateway: discoveryGateway,
           );
           await directory.load();
           final acknowledgements = _FakeAcknowledgementGateway();
-          final sendGateway = _AcceptingSendGateway(acknowledgements, now);
+          final sendGateway = _AcceptingSendGateway(
+            acknowledgements,
+            now,
+            events: events,
+          );
           final scheduler = _RecordingScheduler(platform);
           final coordinator = SendQueueDeliveryCoordinator(
             repository: repository,
@@ -165,6 +210,7 @@ void main() {
           expect(success, isTrue);
           expect(repository.record?.status, SendQueueStatus.sent);
           expect(sendGateway.callCount, 1);
+          expect(events, containsAllInOrder(['hydrate', 'claim', 'send']));
           expect(repository.closed, isTrue);
           if (platform == BackgroundSendPlatform.ios) {
             expect(scheduler.reconcileCalls, 1);
@@ -290,7 +336,9 @@ void main() {
 void _callbackDispatcher() {}
 
 class _RestoringDiscoveryGateway implements GarminDeviceDiscoveryGateway {
-  const _RestoringDiscoveryGateway();
+  const _RestoringDiscoveryGateway([this.events]);
+
+  final List<String>? events;
 
   @override
   Stream<GarminDevice> get deviceUpdates => const Stream<GarminDevice>.empty();
@@ -301,7 +349,10 @@ class _RestoringDiscoveryGateway implements GarminDeviceDiscoveryGateway {
   @override
   Future<List<GarminDevice>> hydrateTransport(
     List<GarminDevice> authorizedDevices,
-  ) async => authorizedDevices;
+  ) async {
+    events?.add('hydrate');
+    return authorizedDevices;
+  }
 }
 
 class _CountingSendGateway implements GarminSendGateway {
@@ -405,10 +456,11 @@ class _FakeAcknowledgementGateway implements GarminAcknowledgementGateway {
 }
 
 class _AcceptingSendGateway implements GarminSendGateway {
-  _AcceptingSendGateway(this.acknowledgements, this.now);
+  _AcceptingSendGateway(this.acknowledgements, this.now, {this.events});
 
   final _FakeAcknowledgementGateway acknowledgements;
   final DateTime now;
+  final List<String>? events;
   var callCount = 0;
 
   @override
@@ -417,6 +469,7 @@ class _AcceptingSendGateway implements GarminSendGateway {
     required MessageEnvelope message,
   }) async {
     callCount += 1;
+    events?.add('send');
     scheduleMicrotask(() {
       acknowledgements.add(
         WatchAcknowledgement(
@@ -435,9 +488,10 @@ class _AcceptingSendGateway implements GarminSendGateway {
 }
 
 class _SingleRecordRepository implements SendQueueRepository {
-  _SingleRecordRepository(this.record);
+  _SingleRecordRepository(this.record, {this.events});
 
   SendQueueRecord? record;
+  final List<String>? events;
   var closed = false;
 
   @override
@@ -459,6 +513,11 @@ class _SingleRecordRepository implements SendQueueRepository {
   Future<List<SendQueueRecord>> readAll() async => [?record];
 
   @override
+  Future<void> removeQuarantinedRows(
+    Set<QueueStorageDiagnosticId> diagnosticIds,
+  ) async {}
+
+  @override
   Future<SendQueueRecord?> findById(String messageId) async =>
       record?.id == messageId ? record : null;
 
@@ -475,6 +534,7 @@ class _SingleRecordRepository implements SendQueueRepository {
     DateTime now, {
     bool ignoreSchedule = false,
   }) async {
+    events?.add('claim');
     final current = record;
     if (current == null ||
         current.id != messageId ||

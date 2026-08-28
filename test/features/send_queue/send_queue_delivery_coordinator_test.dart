@@ -602,6 +602,11 @@ class _MemoryQueueRepository implements SendQueueRepository {
   }
 
   @override
+  Future<void> removeQuarantinedRows(
+    Set<QueueStorageDiagnosticId> diagnosticIds,
+  ) async {}
+
+  @override
   Future<SendQueueRecord?> findById(String messageId) async =>
       _records[messageId];
 

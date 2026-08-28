@@ -21,6 +21,22 @@ flutter build apk --debug --flavor prod
 flutter build ios --no-codesign --flavor prod
 ```
 
+### Android Gradle launcher
+
+Run direct Android Gradle tasks through the JDK-aware launcher:
+
+```sh
+dart run tool/android_gradle.dart testDevDebugUnitTest testProdDebugUnitTest
+```
+
+It accepts any Gradle tasks, uses JDK 17 or 21 from `JAVA_HOME` or Flutter, and
+needs no local Codex configuration. If Flutter has no supported JDK, configure
+one with:
+
+```sh
+flutter config --jdk-dir="/path/to/jdk"
+```
+
 ### Google Maps API keys
 
 Follow Google's

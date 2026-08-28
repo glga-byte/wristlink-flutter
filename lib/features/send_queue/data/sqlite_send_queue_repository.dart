@@ -13,7 +13,7 @@ class SqliteSendQueueRepository implements SendQueueRepository {
     DatabaseFactory? databaseFactory,
   }) : _databaseFactory = databaseFactory ?? databaseFactorySqflitePlugin;
 
-  static const schemaVersion = 1;
+  static const schemaVersion = 2;
   static const defaultDatabaseName = 'wristlink-send-queue.db';
 
   final String path;
@@ -34,7 +34,34 @@ class SqliteSendQueueRepository implements SendQueueRepository {
         options: OpenDatabaseOptions(
           version: schemaVersion,
           onCreate: (database, version) async {
-            await database.execute('''
+            await _createQueueTable(database);
+            await _createQuarantineTable(database);
+          },
+          onUpgrade: (database, oldVersion, newVersion) async {
+            if (oldVersion < 2) {
+              await _createQuarantineTable(database);
+            }
+          },
+          onDowngrade: (database, oldVersion, newVersion) async {
+            throw StateError(
+              'Refusing to downgrade send queue schema from '
+              '$oldVersion to $newVersion.',
+            );
+          },
+        ),
+      );
+      await _refreshDiagnostics();
+    } catch (error) {
+      throw QueueStorageException(
+        QueueStorageErrorCode.unavailable,
+        'The durable send queue could not be opened.',
+        cause: error,
+      );
+    }
+  }
+
+  static Future<void> _createQueueTable(Database database) async {
+    await database.execute('''
 CREATE TABLE send_queue (
   message_id TEXT PRIMARY KEY,
   envelope_json TEXT NOT NULL,
@@ -50,26 +77,36 @@ CREATE TABLE send_queue (
   acknowledgement_deadline INTEGER
 )
 ''');
-            await database.execute(
-              'CREATE INDEX send_queue_eligible_idx '
-              'ON send_queue(status, next_attempt_at, created_at)',
-            );
-          },
-          onDowngrade: (database, oldVersion, newVersion) async {
-            throw StateError(
-              'Refusing to downgrade send queue schema from '
-              '$oldVersion to $newVersion.',
-            );
-          },
+    await database.execute(
+      'CREATE INDEX send_queue_eligible_idx '
+      'ON send_queue(status, next_attempt_at, created_at)',
+    );
+  }
+
+  static Future<void> _createQuarantineTable(Database database) =>
+      database.execute('''
+CREATE TABLE send_queue_quarantine (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  record_id TEXT,
+  reason TEXT NOT NULL,
+  row_json TEXT NOT NULL,
+  quarantined_at INTEGER NOT NULL
+)
+''');
+
+  Future<void> _refreshDiagnostics() async {
+    final rows = await _db.query('send_queue_quarantine', orderBy: 'id ASC');
+    _diagnostics
+      ..clear()
+      ..addAll(
+        rows.map(
+          (row) => QueueStorageDiagnostic(
+            id: QueueStorageDiagnosticId(row['id']! as int),
+            recordId: row['record_id'] as String?,
+            message: row['reason']! as String,
+          ),
         ),
       );
-    } catch (error) {
-      throw QueueStorageException(
-        QueueStorageErrorCode.unavailable,
-        'The durable send queue could not be opened.',
-        cause: error,
-      );
-    }
   }
 
   Database get _db {
@@ -117,76 +154,127 @@ CREATE TABLE send_queue (
 
   @override
   Future<List<SendQueueRecord>> readAll() async {
-    final rows = await _db.query(
-      'send_queue',
-      orderBy: 'updated_at DESC, created_at DESC',
-    );
-    final records = <SendQueueRecord>[];
-    _diagnostics.clear();
-    for (final row in rows) {
-      try {
-        records.add(_record(row));
-      } catch (error) {
-        _diagnostics.add(
-          QueueStorageDiagnostic(
-            recordId: row['message_id'] as String?,
-            message: 'Corrupted queue row was ignored: $error',
-          ),
-        );
+    final records = await _db.transaction((transaction) async {
+      final rows = await transaction.rawQuery(
+        'SELECT rowid AS queue_rowid, * FROM send_queue '
+        'ORDER BY updated_at DESC, created_at DESC',
+      );
+      final validRecords = <SendQueueRecord>[];
+      for (final row in rows) {
+        try {
+          validRecords.add(_record(row));
+        } catch (error) {
+          await _quarantineRow(transaction, row, error);
+        }
       }
-    }
+      return validRecords;
+    });
+    await _refreshDiagnostics();
     return List.unmodifiable(records);
   }
 
   @override
-  Future<SendQueueRecord?> findById(String messageId) async {
-    final rows = await _db.query(
-      'send_queue',
-      where: 'message_id = ?',
-      whereArgs: [messageId],
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
+  Future<void> removeQuarantinedRows(
+    Set<QueueStorageDiagnosticId> diagnosticIds,
+  ) async {
+    if (diagnosticIds.isEmpty) return;
     try {
-      return _record(rows.single);
-    } catch (error) {
+      final placeholders = List.filled(diagnosticIds.length, '?').join(',');
+      await _db.delete(
+        'send_queue_quarantine',
+        where: 'id IN ($placeholders)',
+        whereArgs: diagnosticIds.map((id) => id.value).toList(growable: false),
+      );
+      await _refreshDiagnostics();
+    } on DatabaseException catch (error) {
       throw QueueStorageException(
-        QueueStorageErrorCode.corruptedRow,
-        'Queue record $messageId is corrupted.',
+        QueueStorageErrorCode.unavailable,
+        'The corrupted queue data could not be removed.',
         cause: error,
       );
     }
   }
 
+  Future<void> _quarantineRow(
+    DatabaseExecutor database,
+    Map<String, Object?> row,
+    Object error,
+  ) async {
+    final queueRowId = row['queue_rowid']! as int;
+    final recordId = row['message_id'] as String?;
+    await database.insert('send_queue_quarantine', <String, Object?>{
+      'record_id': recordId,
+      'reason': 'A corrupted queue item was isolated: $error',
+      'row_json': jsonEncode(
+        Map<String, Object?>.of(row)..remove('queue_rowid'),
+      ),
+      'quarantined_at': DateTime.now().toUtc().millisecondsSinceEpoch,
+    });
+    await database.delete(
+      'send_queue',
+      where: 'rowid = ?',
+      whereArgs: [queueRowId],
+    );
+  }
+
   @override
-  Future<SendQueueRecord?> claimNextEligible(DateTime now) {
-    final nowUtc = now.toUtc();
-    return _db.transaction((transaction) async {
-      final rows = await transaction.query(
-        'send_queue',
-        where:
-            "status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)",
-        whereArgs: [nowUtc.millisecondsSinceEpoch],
-        orderBy: 'created_at ASC',
-        limit: 1,
+  Future<SendQueueRecord?> findById(String messageId) async {
+    final record = await _db.transaction((transaction) async {
+      final rows = await transaction.rawQuery(
+        'SELECT rowid AS queue_rowid, * FROM send_queue '
+        'WHERE message_id = ? LIMIT 1',
+        [messageId],
       );
       if (rows.isEmpty) return null;
-      final id = rows.single['message_id']! as String;
-      final count = await transaction.rawUpdate(
-        "UPDATE send_queue SET status = 'sending', updated_at = ?, "
-        'attempt_count = attempt_count + 1, next_attempt_at = NULL '
-        "WHERE message_id = ? AND status = 'pending'",
-        [nowUtc.millisecondsSinceEpoch, id],
-      );
-      if (count != 1) return null;
-      final claimedRows = await transaction.query(
-        'send_queue',
-        where: 'message_id = ?',
-        whereArgs: [id],
-        limit: 1,
-      );
-      return _record(claimedRows.single);
+      try {
+        return _record(rows.single);
+      } catch (error) {
+        await _quarantineRow(transaction, rows.single, error);
+        return null;
+      }
     });
+    await _refreshDiagnostics();
+    return record;
+  }
+
+  @override
+  Future<SendQueueRecord?> claimNextEligible(DateTime now) async {
+    final nowUtc = now.toUtc();
+    final claimed = await _db.transaction((transaction) async {
+      final rows = await transaction.rawQuery(
+        'SELECT rowid AS queue_rowid, * FROM send_queue '
+        "WHERE status = 'pending' "
+        'AND (next_attempt_at IS NULL OR next_attempt_at <= ?) '
+        'ORDER BY created_at ASC',
+        [nowUtc.millisecondsSinceEpoch],
+      );
+      for (final row in rows) {
+        try {
+          _record(row);
+        } catch (error) {
+          await _quarantineRow(transaction, row, error);
+          continue;
+        }
+        final id = row['message_id']! as String;
+        final count = await transaction.rawUpdate(
+          "UPDATE send_queue SET status = 'sending', updated_at = ?, "
+          'attempt_count = attempt_count + 1, next_attempt_at = NULL '
+          "WHERE message_id = ? AND status = 'pending'",
+          [nowUtc.millisecondsSinceEpoch, id],
+        );
+        if (count != 1) continue;
+        final claimedRows = await transaction.query(
+          'send_queue',
+          where: 'message_id = ?',
+          whereArgs: [id],
+          limit: 1,
+        );
+        return _record(claimedRows.single);
+      }
+      return null;
+    });
+    await _refreshDiagnostics();
+    return claimed;
   }
 
   @override
@@ -194,9 +282,9 @@ CREATE TABLE send_queue (
     String messageId,
     DateTime now, {
     bool ignoreSchedule = false,
-  }) {
+  }) async {
     final nowUtc = now.toUtc();
-    return _db.transaction((transaction) async {
+    final claimed = await _db.transaction((transaction) async {
       final scheduleClause = ignoreSchedule
           ? ''
           : ' AND (next_attempt_at IS NULL OR next_attempt_at <= ?)';
@@ -204,13 +292,18 @@ CREATE TABLE send_queue (
         messageId,
         if (!ignoreSchedule) nowUtc.millisecondsSinceEpoch,
       ];
-      final rows = await transaction.query(
-        'send_queue',
-        where: "message_id = ? AND status = 'pending'$scheduleClause",
-        whereArgs: whereArgs,
-        limit: 1,
+      final rows = await transaction.rawQuery(
+        'SELECT rowid AS queue_rowid, * FROM send_queue '
+        "WHERE message_id = ? AND status = 'pending'$scheduleClause LIMIT 1",
+        whereArgs,
       );
       if (rows.isEmpty) return null;
+      try {
+        _record(rows.single);
+      } catch (error) {
+        await _quarantineRow(transaction, rows.single, error);
+        return null;
+      }
       final count = await transaction.rawUpdate(
         "UPDATE send_queue SET status = 'sending', updated_at = ?, "
         'attempt_count = attempt_count + 1, next_attempt_at = NULL '
@@ -230,6 +323,8 @@ CREATE TABLE send_queue (
       );
       return _record(claimedRows.single);
     });
+    await _refreshDiagnostics();
+    return claimed;
   }
 
   @override
