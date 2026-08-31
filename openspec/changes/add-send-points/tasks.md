@@ -52,6 +52,8 @@
 - [x] 7.4 Implement `BackgroundSendScheduler` with WorkManager/BackgroundTasks registration, constraints, unique work, cancellation when no retryable work remains, and platform scheduling errors mapped without losing pending records.
 - [x] 7.5 Add the top-level background Dart entrypoint and minimal headless composition for SQLite queue storage, persisted device settings, Garmin transport/acknowledgements, and the coordinator; register native bridges idempotently for foreground and background engines.
 - [x] 7.6 Add deterministic coordinator/background tests for ready/offline/missing-companion targets, transport and acknowledgement outcomes, backoff, overlapping triggers, process interruption, platform deadline/cancellation, and foreground fallback when background execution is delayed.
+- [x] 7.7 Return from point submission after durable enqueue and launch submission/startup drains as observed asynchronous work so acknowledgement waits do not block confirmation navigation or app-shell initialization; cover controller updates, overlapping triggers, errors, and disposal in tests.
+- [x] 7.8 Consume the unified acknowledgement event stream in the delivery coordinator, forward malformed gateway diagnostics as delivery diagnostics without queue mutation, and test malformed and valid events arriving in sequence.
 
 ## 8. Manual Picker, Confirmation, and Recovery UI
 

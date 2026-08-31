@@ -178,7 +178,11 @@ void main() {
       );
       await restoredService.initialize();
 
-      final restored = (await restoredRepository.readAll()).single;
+      final restored = await _waitForStatus(
+        restoredRepository,
+        queued.id,
+        SendQueueStatus.sent,
+      );
       expect(restored.id, queued.id);
       expect(restored.message.toJson(), queued.message.toJson());
       expect(restored.status, SendQueueStatus.sent);
@@ -215,6 +219,19 @@ SendQueueDeliveryService _deliveryService({
     backgroundScheduler: const _NoOpBackgroundScheduler(),
     clock: now,
   );
+}
+
+Future<SendQueueRecord> _waitForStatus(
+  SendQueueRepository repository,
+  String messageId,
+  SendQueueStatus status,
+) async {
+  for (var attempt = 0; attempt < 50; attempt += 1) {
+    final record = await repository.findById(messageId);
+    if (record?.status == status) return record!;
+    await pumpEventQueue();
+  }
+  throw TestFailure('Queue record $messageId did not reach $status.');
 }
 
 WristLinkAppDependencies _dependencies({

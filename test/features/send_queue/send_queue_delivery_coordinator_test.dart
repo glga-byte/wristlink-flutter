@@ -240,6 +240,87 @@ void main() {
     });
 
     test(
+      'forwards a malformed event before applying the next valid acknowledgement',
+      () async {
+        final now = DateTime.utc(2026, 8, 20, 12);
+        final repository = _MemoryQueueRepository();
+        await repository.enqueue(_pointRecord(_id(1), now));
+        final unrelated = _pointRecord(
+          _id(2),
+          now.add(const Duration(seconds: 1)),
+        ).copyWith(status: SendQueueStatus.sent);
+        repository.seed(unrelated);
+        final acknowledgements = _FakeAcknowledgementGateway();
+        const malformed = GarminAcknowledgementDiagnostic(
+          code: GarminAcknowledgementDiagnosticCode.invalidContract,
+          message: 'Acknowledgement status is malformed.',
+          contractErrorCode: ContractErrorCode.malformedPayload,
+        );
+        final forwarded = Completer<void>();
+        final deliveryDiagnostics = <DeliveryDiagnostic>[];
+        final sendGateway = _FakeSendGateway((deviceId, message) async {
+          acknowledgements.addDiagnostic(malformed);
+          await forwarded.future;
+          expect(
+            (await repository.findById(unrelated.id))!.toJson(),
+            unrelated.toJson(),
+          );
+          acknowledgements.add(
+            _ack(message.id, WatchAcknowledgementStatus.accepted),
+          );
+          return const GarminSendResult(
+            status: GarminSendStatus.deliveredToTransport,
+            requiresAcknowledgement: true,
+          );
+        });
+        final coordinator = _coordinator(
+          repository: repository,
+          directory: _FakeDeviceDirectory([_readyDevice]),
+          sendGateway: sendGateway,
+          acknowledgements: acknowledgements,
+          now: () => now,
+        );
+
+        final diagnosticSubscription = coordinator.diagnostics.listen((
+          diagnostic,
+        ) {
+          deliveryDiagnostics.add(diagnostic);
+          if (!forwarded.isCompleted) forwarded.complete();
+        });
+        await coordinator.start();
+        await coordinator.requestDrain(QueueDrainTrigger.submission);
+        await pumpEventQueue();
+
+        expect(deliveryDiagnostics, hasLength(1));
+        expect(
+          deliveryDiagnostics.single.code,
+          DeliveryDiagnosticCode.malformedAcknowledgement,
+        );
+        expect(deliveryDiagnostics.single.message, malformed.message);
+        expect(
+          deliveryDiagnostics.single.acknowledgementDiagnosticCode,
+          malformed.code,
+        );
+        expect(
+          deliveryDiagnostics.single.contractErrorCode,
+          malformed.contractErrorCode,
+        );
+        expect(
+          (await repository.findById(_id(1)))!.status,
+          SendQueueStatus.sent,
+        );
+        expect(
+          (await repository.findById(unrelated.id))!.toJson(),
+          unrelated.toJson(),
+        );
+
+        await diagnosticSubscription.cancel();
+        await coordinator.dispose();
+        await acknowledgements.close();
+      },
+    );
+
+    test(
       'overlapping triggers share one drain and one transport attempt',
       () async {
         final now = DateTime.utc(2026, 8, 20, 12);
@@ -363,6 +444,175 @@ void main() {
 
   group('SendQueueDeliveryService', () {
     test(
+      'startup drain does not block initialization and disposal awaits it',
+      () async {
+        final now = DateTime.utc(2026, 8, 20, 12);
+        final repository = _MemoryQueueRepository();
+        await repository.enqueue(_pointRecord(_id(1), now));
+        final directory = _FakeDeviceDirectory([_readyDevice]);
+        final acknowledgements = _FakeAcknowledgementGateway();
+        final sendStarted = Completer<void>();
+        final finishSend = Completer<GarminSendResult>();
+        final service = SendQueueDeliveryService(
+          repository: repository,
+          controller: SendQueueController(repository),
+          coordinator: _coordinator(
+            repository: repository,
+            directory: directory,
+            sendGateway: _FakeSendGateway((deviceId, message) async {
+              sendStarted.complete();
+              final result = await finishSend.future;
+              scheduleMicrotask(() {
+                acknowledgements.add(
+                  _ack(message.id, WatchAcknowledgementStatus.accepted),
+                );
+              });
+              return result;
+            }),
+            acknowledgements: acknowledgements,
+            now: () => now,
+          ),
+          deviceDirectory: directory,
+          backgroundScheduler: _FakeBackgroundScheduler(),
+          clock: () => now,
+        );
+
+        final initialization = service.initialize();
+        await sendStarted.future;
+        var initializationCompleted = false;
+        unawaited(
+          initialization.whenComplete(() {
+            initializationCompleted = true;
+          }),
+        );
+        await pumpEventQueue();
+
+        expect(initializationCompleted, isTrue);
+        expect(
+          (await repository.readAll()).single.status,
+          SendQueueStatus.sending,
+        );
+
+        final disposal = service.disposeService();
+        var disposalCompleted = false;
+        unawaited(
+          disposal.whenComplete(() {
+            disposalCompleted = true;
+          }),
+        );
+        await pumpEventQueue();
+        expect(disposalCompleted, isFalse);
+
+        finishSend.complete(
+          const GarminSendResult(
+            status: GarminSendStatus.deliveredToTransport,
+            requiresAcknowledgement: true,
+          ),
+        );
+        await disposal;
+
+        expect(
+          (await repository.readAll()).single.status,
+          SendQueueStatus.sent,
+        );
+        expect(repository.closeCount, 1);
+        await acknowledgements.close();
+      },
+    );
+
+    test(
+      'submission returns pending while overlapping delivery updates controller',
+      () async {
+        final now = DateTime.utc(2026, 8, 20, 12);
+        final repository = _MemoryQueueRepository();
+        final controller = SendQueueController(repository);
+        final directory = _FakeDeviceDirectory([_readyDevice]);
+        final acknowledgements = _FakeAcknowledgementGateway();
+        final sendStarted = Completer<void>();
+        final sendGateway = _FakeSendGateway((deviceId, message) async {
+          sendStarted.complete();
+          return const GarminSendResult(
+            status: GarminSendStatus.deliveredToTransport,
+            requiresAcknowledgement: true,
+          );
+        });
+        final service = SendQueueDeliveryService(
+          repository: repository,
+          controller: controller,
+          coordinator: _coordinator(
+            repository: repository,
+            directory: directory,
+            sendGateway: sendGateway,
+            acknowledgements: acknowledgements,
+            now: () => now,
+          ),
+          deviceDirectory: directory,
+          backgroundScheduler: _FakeBackgroundScheduler(),
+          clock: () => now,
+        );
+
+        await service.initialize();
+        final submitted = await service.submit(_pointRecord(_id(1), now));
+
+        expect(submitted.status, SendQueueStatus.pending);
+        await sendStarted.future;
+        await pumpEventQueue(times: 10);
+        expect(controller.records.single.status, SendQueueStatus.sending);
+
+        final overlapping = service.trigger(QueueDrainTrigger.deviceReadiness);
+        acknowledgements.add(_ack(_id(1), WatchAcknowledgementStatus.accepted));
+        await overlapping;
+        await pumpEventQueue(times: 10);
+
+        expect(sendGateway.callCount, 1);
+        expect(controller.records.single.status, SendQueueStatus.sent);
+        await service.disposeService();
+        await acknowledgements.close();
+      },
+    );
+
+    test('reports errors from asynchronous startup delivery', () async {
+      final now = DateTime.utc(2026, 8, 20, 12);
+      final repository = _MemoryQueueRepository();
+      final directory = _FakeDeviceDirectory([_readyDevice]);
+      final acknowledgements = _FakeAcknowledgementGateway();
+      final error = StateError('Scheduling failed.');
+      final reported = Completer<FlutterErrorDetails>();
+      final previousErrorHandler = FlutterError.onError;
+      FlutterError.onError = (details) {
+        if (!reported.isCompleted) reported.complete(details);
+      };
+      addTearDown(() {
+        FlutterError.onError = previousErrorHandler;
+      });
+      final service = SendQueueDeliveryService(
+        repository: repository,
+        controller: SendQueueController(repository),
+        coordinator: _coordinator(
+          repository: repository,
+          directory: directory,
+          sendGateway: _FakeSendGateway.success(),
+          acknowledgements: acknowledgements,
+          now: () => now,
+        ),
+        deviceDirectory: directory,
+        backgroundScheduler: _FakeBackgroundScheduler(reconcileError: error),
+        clock: () => now,
+      );
+
+      await service.initialize();
+      final details = await reported.future;
+
+      expect(details.exception, same(error));
+      expect(
+        details.context.toString(),
+        contains('asynchronous startup queue drain'),
+      );
+      await service.disposeService();
+      await acknowledgements.close();
+    });
+
+    test(
       'foreground hydration recovers failed startup before draining',
       () async {
         final now = DateTime.utc(2026, 8, 20, 12);
@@ -467,6 +717,7 @@ void main() {
         );
 
         await service.initialize();
+        await pumpEventQueue(times: 10);
         expect(
           (await repository.readAll()).single.status,
           SendQueueStatus.pending,
@@ -517,7 +768,10 @@ void main() {
       );
 
       await service.initialize();
-      final sent = await service.submit(_pointRecord(_id(1), now));
+      final submitted = await service.submit(_pointRecord(_id(1), now));
+      expect(submitted.status, SendQueueStatus.pending);
+      await pumpEventQueue(times: 10);
+      final sent = (await repository.readAll()).single;
       expect(sent.status, SendQueueStatus.sent);
       repository.seed(
         sent.copyWith(
@@ -570,6 +824,7 @@ SendQueueDeliveryCoordinator _coordinator({
 
 class _MemoryQueueRepository implements SendQueueRepository {
   final Map<String, SendQueueRecord> _records = {};
+  var closeCount = 0;
 
   void seed(SendQueueRecord record) => _records[record.id] = record;
 
@@ -580,7 +835,9 @@ class _MemoryQueueRepository implements SendQueueRepository {
   Future<void> initialize() async {}
 
   @override
-  Future<void> close() async {}
+  Future<void> close() async {
+    closeCount += 1;
+  }
 
   @override
   Future<SendQueueRecord> enqueue(SendQueueRecord record) async {
@@ -770,28 +1027,37 @@ class _FakeSendGateway implements GarminSendGateway {
 }
 
 class _FakeAcknowledgementGateway implements GarminAcknowledgementGateway {
-  final StreamController<WatchAcknowledgement> _controller =
-      StreamController<WatchAcknowledgement>.broadcast();
+  final StreamController<GarminAcknowledgementEvent> _controller =
+      StreamController<GarminAcknowledgementEvent>.broadcast();
 
   void add(WatchAcknowledgement acknowledgement) {
-    _controller.add(acknowledgement);
+    _controller.add(GarminAcknowledgementReceived(acknowledgement));
   }
+
+  void addDiagnostic(GarminAcknowledgementDiagnostic diagnostic) =>
+      _controller.add(diagnostic);
 
   Future<void> close() => _controller.close();
 
   @override
-  Stream<WatchAcknowledgement> get acknowledgements => _controller.stream;
+  Stream<WatchAcknowledgement> get acknowledgements => _controller.stream
+      .where((event) => event is GarminAcknowledgementReceived)
+      .cast<GarminAcknowledgementReceived>()
+      .map((event) => event.acknowledgement);
 
   @override
-  Stream<GarminAcknowledgementDiagnostic> get diagnostics =>
-      const Stream.empty();
+  Stream<GarminAcknowledgementDiagnostic> get diagnostics => _controller.stream
+      .where((event) => event is GarminAcknowledgementDiagnostic)
+      .cast<GarminAcknowledgementDiagnostic>();
 
   @override
-  Stream<GarminAcknowledgementEvent> get events =>
-      acknowledgements.map(GarminAcknowledgementReceived.new);
+  Stream<GarminAcknowledgementEvent> get events => _controller.stream;
 }
 
 class _FakeBackgroundScheduler implements BackgroundSendScheduler {
+  _FakeBackgroundScheduler({this.reconcileError});
+
+  final Object? reconcileError;
   var reconcileCount = 0;
 
   @override
@@ -811,6 +1077,8 @@ class _FakeBackgroundScheduler implements BackgroundSendScheduler {
     required DateTime now,
   }) async {
     reconcileCount += 1;
+    final error = reconcileError;
+    if (error != null) throw error;
     return hasRetryableWork
         ? const BackgroundSchedulingResult.scheduled()
         : const BackgroundSchedulingResult.cancelled();

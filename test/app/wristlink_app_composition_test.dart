@@ -14,6 +14,7 @@ import 'package:wristlink_flutter/features/garmin_bridge/garmin_device_discovery
 import 'package:wristlink_flutter/features/garmin_bridge/garmin_send_gateway.dart';
 import 'package:wristlink_flutter/features/payloads/message_contract.dart';
 import 'package:wristlink_flutter/features/send_queue/background/background_send_scheduler.dart';
+import 'package:wristlink_flutter/features/send_queue/data/send_queue_repository.dart';
 import 'package:wristlink_flutter/features/send_queue/domain/send_queue_record.dart';
 
 import '../support/send_point_ui_fakes.dart';
@@ -164,10 +165,12 @@ void main() {
           hydrationMayComplete.complete();
           await initialization;
 
-          expect(
-            (await repository.findById(_persistedMessageId))!.status,
+          final startupDelivered = await _waitForStatus(
+            repository,
+            _persistedMessageId,
             SendQueueStatus.sent,
           );
+          expect(startupDelivered.status, SendQueueStatus.sent);
           expect(events, ['hydrate', 'send:${fixture.rawDeviceId}']);
           expect(discoveryCalls, 0);
 
@@ -175,7 +178,13 @@ void main() {
             _pendingRecord(_submittedMessageId, persistedDevice.id),
           );
 
-          expect(submitted.status, SendQueueStatus.sent);
+          expect(submitted.status, SendQueueStatus.pending);
+          final deliveredSubmission = await _waitForStatus(
+            repository,
+            _submittedMessageId,
+            SendQueueStatus.sent,
+          );
+          expect(deliveredSubmission.status, SendQueueStatus.sent);
           expect(events, [
             'hydrate',
             'send:${fixture.rawDeviceId}',
@@ -289,15 +298,17 @@ class _ChannelHydrationGateway implements GarminDeviceDiscoveryGateway {
 }
 
 class _FakeAcknowledgementGateway implements GarminAcknowledgementGateway {
-  final _controller = StreamController<WatchAcknowledgement>.broadcast();
+  final _controller = StreamController<GarminAcknowledgementEvent>.broadcast();
 
   void accept(String messageId) {
     _controller.add(
-      WatchAcknowledgement(
-        id: _acknowledgementId,
-        ackFor: messageId,
-        status: WatchAcknowledgementStatus.accepted,
-        receivedAt: _now,
+      GarminAcknowledgementReceived(
+        WatchAcknowledgement(
+          id: _acknowledgementId,
+          ackFor: messageId,
+          status: WatchAcknowledgementStatus.accepted,
+          receivedAt: _now,
+        ),
       ),
     );
   }
@@ -305,14 +316,18 @@ class _FakeAcknowledgementGateway implements GarminAcknowledgementGateway {
   Future<void> close() => _controller.close();
 
   @override
-  Stream<WatchAcknowledgement> get acknowledgements => _controller.stream;
+  Stream<WatchAcknowledgement> get acknowledgements => _controller.stream
+      .where((event) => event is GarminAcknowledgementReceived)
+      .cast<GarminAcknowledgementReceived>()
+      .map((event) => event.acknowledgement);
 
   @override
-  Stream<GarminAcknowledgementDiagnostic> get diagnostics =>
-      const Stream.empty();
+  Stream<GarminAcknowledgementDiagnostic> get diagnostics => _controller.stream
+      .where((event) => event is GarminAcknowledgementDiagnostic)
+      .cast<GarminAcknowledgementDiagnostic>();
 
   @override
-  Stream<GarminAcknowledgementEvent> get events => const Stream.empty();
+  Stream<GarminAcknowledgementEvent> get events => _controller.stream;
 }
 
 Future<_RoundTripFixture> _loadRoundTripFixture(String platform) async {
@@ -341,6 +356,19 @@ class _RoundTripFixture {
 
   final String rawDeviceId;
   final Map<Object?, Object?> discoveryPayload;
+}
+
+Future<SendQueueRecord> _waitForStatus(
+  SendQueueRepository repository,
+  String messageId,
+  SendQueueStatus status,
+) async {
+  for (var attempt = 0; attempt < 50; attempt += 1) {
+    final record = await repository.findById(messageId);
+    if (record?.status == status) return record!;
+    await pumpEventQueue();
+  }
+  throw TestFailure('Queue record $messageId did not reach $status.');
 }
 
 SendQueueRecord _pendingRecord(String messageId, GarminDeviceId deviceId) {

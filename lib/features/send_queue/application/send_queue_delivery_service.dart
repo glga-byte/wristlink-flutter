@@ -30,6 +30,7 @@ class SendQueueDeliveryService extends WidgetsBindingObserver {
   final DeviceDirectoryController _deviceDirectory;
   final BackgroundSendScheduler _backgroundScheduler;
   final DeliveryClock _clock;
+  final Set<Future<void>> _activeAsynchronousWork = <Future<void>>{};
   StreamSubscription<SendQueueRecord>? _mutationSubscription;
   Future<QueueDrainResult>? _foregroundTrigger;
   var _hydratingForForeground = false;
@@ -48,19 +49,22 @@ class SendQueueDeliveryService extends WidgetsBindingObserver {
     await _backgroundScheduler.initialize();
     await _coordinator.start();
     _mutationSubscription = _coordinator.mutations.listen((_) {
-      unawaited(_refreshSnapshot());
+      _launchObservedWork(
+        _refreshSnapshot,
+        context: 'refreshing the queue after a delivery mutation',
+      );
     });
     _deviceDirectory.addListener(_handleDeviceDirectoryChange);
     WidgetsBinding.instance.addObserver(this);
     _initialized = true;
-    await trigger(QueueDrainTrigger.startup);
+    _launchObservedDrain(QueueDrainTrigger.startup);
   }
 
   Future<SendQueueRecord> submit(SendQueueRecord record) async {
     _ensureReady();
     final stored = await _controller.enqueue(record);
-    await trigger(QueueDrainTrigger.submission);
-    return (await _repository.findById(stored.id)) ?? stored;
+    _launchObservedDrain(QueueDrainTrigger.submission);
+    return stored;
   }
 
   Future<SendQueueRecord> retry(String messageId) async {
@@ -108,7 +112,7 @@ class SendQueueDeliveryService extends WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _initialized && !_disposed) {
-      unawaited(trigger(QueueDrainTrigger.foreground));
+      _launchObservedDrain(QueueDrainTrigger.foreground);
     }
   }
 
@@ -118,14 +122,48 @@ class SendQueueDeliveryService extends WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _deviceDirectory.removeListener(_handleDeviceDirectoryChange);
     await _mutationSubscription?.cancel();
+    await Future.wait(List<Future<void>>.of(_activeAsynchronousWork));
     await _coordinator.dispose();
     await _controller.disposeRepository();
   }
 
   void _handleDeviceDirectoryChange() {
     if (_initialized && !_disposed && !_hydratingForForeground) {
-      unawaited(trigger(QueueDrainTrigger.deviceReadiness));
+      _launchObservedDrain(QueueDrainTrigger.deviceReadiness);
     }
+  }
+
+  void _launchObservedDrain(QueueDrainTrigger trigger) {
+    _launchObservedWork(() async {
+      await this.trigger(trigger);
+    }, context: 'running an asynchronous ${trigger.name} queue drain');
+  }
+
+  void _launchObservedWork(
+    Future<void> Function() work, {
+    required String context,
+  }) {
+    if (_disposed) return;
+    late final Future<void> tracked;
+    tracked = Future<void>.sync(work)
+        .then<void>(
+          (_) {},
+          onError: (Object error, StackTrace stackTrace) {
+            FlutterError.reportError(
+              FlutterErrorDetails(
+                exception: error,
+                stack: stackTrace,
+                library: 'WristLink send queue',
+                context: ErrorDescription(context),
+              ),
+            );
+          },
+        )
+        .whenComplete(() {
+          _activeAsynchronousWork.remove(tracked);
+        });
+    _activeAsynchronousWork.add(tracked);
+    unawaited(tracked);
   }
 
   Future<void> _refreshSnapshot() async {

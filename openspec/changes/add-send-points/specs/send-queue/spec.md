@@ -103,6 +103,10 @@ The system SHALL attempt eligible pending records on submission, app startup or 
 - **WHEN** the operating system postpones or denies scheduled background work
 - **THEN** pending records remain durable and are reconsidered at the next startup, foreground, device-readiness, or background trigger
 
+#### Scenario: Startup delivery continues after the app shell is ready
+- **WHEN** foreground startup finds eligible records whose transport acknowledgement remains outstanding
+- **THEN** the system makes the app shell available after queue services and acknowledgement handling are initialized, continues the mandatory startup drain asynchronously, and publishes each persisted queue transition without holding the app on its initialization state
+
 #### Scenario: Cold process restores eligible work
 - **WHEN** foreground or background composition starts with persisted authorized devices and eligible queue records but no in-memory native Garmin device/app cache
 - **THEN** the system rehydrates current platform transport state before claiming a record or invoking Garmin send
@@ -129,6 +133,10 @@ The system SHALL correlate watch acknowledgements by original message id and SHA
 #### Scenario: Duplicate acknowledgement arrives
 - **WHEN** an acknowledgement repeats an outcome already applied to a record
 - **THEN** the system treats it idempotently and does not regress the record's state
+
+#### Scenario: Malformed acknowledgement arrives
+- **WHEN** a raw native acknowledgement event cannot be validated as a `WatchAcknowledgement`
+- **THEN** the system leaves every queue record unchanged and forwards the validation failure through the delivery diagnostic path instead of silently discarding it
 
 ### Requirement: Queue-Backed Presentation
 The Queue destination and point status screens SHALL render persisted queue records rather than screen-local examples, using user-facing labels that map consistently to the four domain statuses.

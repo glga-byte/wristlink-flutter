@@ -435,24 +435,28 @@ class _RecordingScheduler implements BackgroundSendScheduler {
 }
 
 class _FakeAcknowledgementGateway implements GarminAcknowledgementGateway {
-  final StreamController<WatchAcknowledgement> _controller =
-      StreamController<WatchAcknowledgement>.broadcast();
+  final StreamController<GarminAcknowledgementEvent> _controller =
+      StreamController<GarminAcknowledgementEvent>.broadcast();
 
   void add(WatchAcknowledgement acknowledgement) {
-    _controller.add(acknowledgement);
+    _controller.add(GarminAcknowledgementReceived(acknowledgement));
   }
 
   Future<void> close() => _controller.close();
 
   @override
-  Stream<WatchAcknowledgement> get acknowledgements => _controller.stream;
+  Stream<WatchAcknowledgement> get acknowledgements => _controller.stream
+      .where((event) => event is GarminAcknowledgementReceived)
+      .cast<GarminAcknowledgementReceived>()
+      .map((event) => event.acknowledgement);
 
   @override
-  Stream<GarminAcknowledgementDiagnostic> get diagnostics =>
-      const Stream.empty();
+  Stream<GarminAcknowledgementDiagnostic> get diagnostics => _controller.stream
+      .where((event) => event is GarminAcknowledgementDiagnostic)
+      .cast<GarminAcknowledgementDiagnostic>();
 
   @override
-  Stream<GarminAcknowledgementEvent> get events => const Stream.empty();
+  Stream<GarminAcknowledgementEvent> get events => _controller.stream;
 }
 
 class _AcceptingSendGateway implements GarminSendGateway {

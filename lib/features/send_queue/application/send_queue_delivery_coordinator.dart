@@ -22,6 +22,7 @@ enum QueueDrainTrigger {
 }
 
 enum DeliveryDiagnosticCode {
+  malformedAcknowledgement,
   unknownAcknowledgement,
   lateAcknowledgement,
   duplicateAcknowledgement,
@@ -35,12 +36,16 @@ class DeliveryDiagnostic {
     required this.message,
     this.messageId,
     this.acknowledgementId,
+    this.acknowledgementDiagnosticCode,
+    this.contractErrorCode,
   });
 
   final DeliveryDiagnosticCode code;
   final String message;
   final String? messageId;
   final String? acknowledgementId;
+  final GarminAcknowledgementDiagnosticCode? acknowledgementDiagnosticCode;
+  final ContractErrorCode? contractErrorCode;
 }
 
 class QueueDrainResult {
@@ -178,7 +183,8 @@ class SendQueueDeliveryCoordinator {
   final Map<String, Completer<WatchAcknowledgement>> _acknowledgementWaiters =
       <String, Completer<WatchAcknowledgement>>{};
 
-  StreamSubscription<WatchAcknowledgement>? _acknowledgementSubscription;
+  StreamSubscription<GarminAcknowledgementEvent>?
+  _acknowledgementEventSubscription;
   Future<QueueDrainResult>? _activeDrain;
   var _drainRequested = false;
   var _ignoreScheduleForNextDrain = false;
@@ -191,8 +197,9 @@ class SendQueueDeliveryCoordinator {
   Future<void> start() async {
     if (_started) return;
     _started = true;
-    _acknowledgementSubscription = _acknowledgementGateway.acknowledgements
-        .listen(_routeAcknowledgement);
+    _acknowledgementEventSubscription = _acknowledgementGateway.events.listen(
+      _routeAcknowledgementEvent,
+    );
     await recoverInterruptedSends();
   }
 
@@ -258,7 +265,7 @@ class SendQueueDeliveryCoordinator {
   }
 
   Future<void> dispose() async {
-    await _acknowledgementSubscription?.cancel();
+    await _acknowledgementEventSubscription?.cancel();
     await _mutations.close();
     await _diagnostics.close();
   }
@@ -481,6 +488,22 @@ class SendQueueDeliveryCoordinator {
       return;
     }
     waiter.complete(acknowledgement);
+  }
+
+  void _routeAcknowledgementEvent(GarminAcknowledgementEvent event) {
+    switch (event) {
+      case GarminAcknowledgementReceived(:final acknowledgement):
+        _routeAcknowledgement(acknowledgement);
+      case GarminAcknowledgementDiagnostic():
+        _diagnostics.add(
+          DeliveryDiagnostic(
+            code: DeliveryDiagnosticCode.malformedAcknowledgement,
+            message: event.message,
+            acknowledgementDiagnosticCode: event.code,
+            contractErrorCode: event.contractErrorCode,
+          ),
+        );
+    }
   }
 
   Future<void> _applyAcknowledgement(

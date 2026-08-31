@@ -126,6 +126,10 @@ The point confirmation flow SHALL derive the default watch, current transport-ba
 ### Requirement: Point Submission Outcome
 The system SHALL validate and durably enqueue a contract-compatible point envelope before attempting Garmin transport, then present a status derived from the resulting queue record.
 
+#### Scenario: Delivery continues after durable submission
+- **WHEN** a valid point has been durably enqueued and its immediate delivery attempt is still awaiting transport or watch acknowledgement
+- **THEN** the confirmation flow proceeds to the queue-backed point status without waiting for delivery to finish, and later persisted queue transitions update that status asynchronously
+
 #### Scenario: Ready watch accepts the point
 - **WHEN** transport succeeds and the required matching watch acknowledgement is accepted
 - **THEN** the system marks the point sent and presents the successful status
