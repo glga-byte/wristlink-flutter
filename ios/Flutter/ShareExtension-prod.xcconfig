@@ -1,0 +1,2 @@
+#include "Generated.xcconfig"
+#include "Flavor-prod.xcconfig"

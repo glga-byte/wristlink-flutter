@@ -2,9 +2,16 @@ import 'package:flutter/services.dart';
 
 import '../devices/domain/device_directory.dart';
 import '../devices/domain/garmin_device.dart';
+import '../devices/domain/physical_device_id_codec.dart';
+
+const _physicalDeviceIdCodec = PhysicalDeviceIdCodec();
 
 abstract interface class GarminDeviceDiscoveryGateway {
   Future<List<GarminDevice>> discoverDevices();
+
+  Future<List<GarminDevice>> hydrateTransport(
+    List<GarminDevice> authorizedDevices,
+  );
 
   Stream<GarminDevice> get deviceUpdates;
 }
@@ -24,6 +31,7 @@ class MethodChannelGarminDeviceDiscoveryGateway
   final MethodChannel _channel;
   final EventChannel _eventChannel;
   final Duration _timeout;
+  Future<List<GarminDevice>>? _inFlightHydration;
 
   @override
   Stream<GarminDevice> get deviceUpdates {
@@ -60,6 +68,65 @@ class MethodChannelGarminDeviceDiscoveryGateway
       );
     }
   }
+
+  @override
+  Future<List<GarminDevice>> hydrateTransport(
+    List<GarminDevice> authorizedDevices,
+  ) {
+    return _inFlightHydration ??= _hydrateAndClear(authorizedDevices);
+  }
+
+  Future<List<GarminDevice>> _hydrateAndClear(
+    List<GarminDevice> authorizedDevices,
+  ) async {
+    try {
+      return await _hydrateTransport(authorizedDevices);
+    } finally {
+      _inFlightHydration = null;
+    }
+  }
+
+  Future<List<GarminDevice>> _hydrateTransport(
+    List<GarminDevice> authorizedDevices,
+  ) async {
+    try {
+      final payload = await _channel
+          .invokeListMethod<Object?>('hydrateTransport', {
+            'devices': authorizedDevices
+                .map(mapGarminTransportHydrationDevice)
+                .toList(growable: false),
+          })
+          .timeout(
+            _timeout,
+            onTimeout: () {
+              throw const GarminDiscoveryError(
+                GarminDiscoveryErrorCode.timeout,
+                'Garmin transport hydration timed out.',
+              );
+            },
+          );
+      return mapNativeDeviceList(payload ?? const <Object?>[]);
+    } on GarminDiscoveryError {
+      rethrow;
+    } on MissingPluginException {
+      throw const GarminDiscoveryError(
+        GarminDiscoveryErrorCode.sdkUnavailable,
+        'Garmin transport hydration is not available.',
+      );
+    } on PlatformException catch (error) {
+      throw mapPlatformException(error);
+    } on PhysicalDeviceIdCodecException catch (error) {
+      throw GarminDiscoveryError(
+        GarminDiscoveryErrorCode.invalidPayload,
+        'Invalid Garmin transport hydration device: ${error.message}',
+      );
+    } on TypeError catch (error) {
+      throw GarminDiscoveryError(
+        GarminDiscoveryErrorCode.invalidPayload,
+        'Invalid Garmin transport hydration payload: $error',
+      );
+    }
+  }
 }
 
 class UnsupportedGarminDeviceDiscoveryGateway
@@ -76,6 +143,26 @@ class UnsupportedGarminDeviceDiscoveryGateway
       'Garmin device discovery is not available on this platform.',
     );
   }
+
+  @override
+  Future<List<GarminDevice>> hydrateTransport(
+    List<GarminDevice> authorizedDevices,
+  ) async {
+    throw const GarminDiscoveryError(
+      GarminDiscoveryErrorCode.unsupportedPlatform,
+      'Garmin transport hydration is not available on this platform.',
+    );
+  }
+}
+
+Map<String, Object?> mapGarminTransportHydrationDevice(GarminDevice device) {
+  return <String, Object?>{
+    'id': _physicalDeviceIdCodec.toRaw(device.id),
+    'name': device.name,
+    'modelName': device.metadata.modelName,
+    'partNumber': device.metadata.family,
+    'unitId': device.metadata.unitId,
+  };
 }
 
 List<GarminDevice> mapNativeDeviceList(List<Object?> payload) {
@@ -96,7 +183,7 @@ GarminDevice mapNativeDevice(Map<Object?, Object?> payload) {
   }
 
   return GarminDevice(
-    id: GarminDeviceId('physical:$id'),
+    id: _mapNativeDeviceId(id),
     name: name,
     reachability: _reachability(payload['reachability']),
     companionInstallState: _companion(payload['companionInstallState']),
@@ -112,6 +199,17 @@ GarminDevice mapNativeDevice(Map<Object?, Object?> payload) {
       ),
     ),
   );
+}
+
+GarminDeviceId _mapNativeDeviceId(String id) {
+  try {
+    return _physicalDeviceIdCodec.fromRaw(id);
+  } on PhysicalDeviceIdCodecException catch (error) {
+    throw GarminDiscoveryError(
+      GarminDiscoveryErrorCode.invalidPayload,
+      'Invalid Garmin device id: ${error.message}',
+    );
+  }
 }
 
 GarminDiscoveryError mapPlatformException(PlatformException error) {

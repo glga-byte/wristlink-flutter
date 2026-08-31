@@ -27,6 +27,7 @@ void main() {
     final parsed = SendQueueRecord.fromJson(json);
     expect(parsed.id, record.id);
     expect(parsed.status, SendQueueStatus.sending);
+    expect(parsed.attemptCount, 0);
     expect(parsed.message.toJson(), record.message.toJson());
   });
 
@@ -129,6 +130,34 @@ void main() {
           ContractErrorCode.invalidAcknowledgementReference,
         ),
       ),
+    );
+  });
+
+  test('failure and retry scheduling metadata round-trip', () {
+    final now = DateTime.utc(2026, 5, 9, 12);
+    final record =
+        SendQueueRecord.pending(
+          message: _message(MessageKind.note, const NotePayload(body: 'Hello')),
+          createdAt: now,
+        ).copyWith(
+          failure: const SendQueueFailure(
+            code: SendQueueFailureCode.transportTimeout,
+            message: 'Timed out.',
+            isTransient: true,
+          ),
+          attemptCount: 3,
+          nextAttemptAt: now.add(const Duration(minutes: 2)),
+          acknowledgementDeadline: now.add(const Duration(seconds: 30)),
+        );
+
+    final parsed = SendQueueRecord.fromJson(record.toJson());
+    expect(parsed.failure?.code, SendQueueFailureCode.transportTimeout);
+    expect(parsed.failure?.isTransient, isTrue);
+    expect(parsed.attemptCount, 3);
+    expect(parsed.nextAttemptAt, now.add(const Duration(minutes: 2)));
+    expect(
+      parsed.acknowledgementDeadline,
+      now.add(const Duration(seconds: 30)),
     );
   });
 }

@@ -1,0 +1,19 @@
+name: wristlink_engine_bridge
+description: Registers WristLink application-owned channels on every Android Flutter engine.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.11.5
+  flutter: '>=3.29.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.wristlink.engine_bridge
+        pluginClass: WristLinkEngineBridgePlugin

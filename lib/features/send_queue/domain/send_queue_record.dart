@@ -3,14 +3,72 @@ import '../../payloads/message_contract.dart';
 
 enum SendQueueStatus { pending, sending, sent, failed }
 
+enum SendQueueFailureCode {
+  targetOffline,
+  sdkUnavailable,
+  transportTimeout,
+  deviceDisconnected,
+  companionMissing,
+  payloadInvalid,
+  payloadTooLarge,
+  unsupportedPlatform,
+  rejected,
+  unsupported,
+  acknowledgementTimeout,
+  deliveryOutcomeUnknown,
+  storageFailure,
+  nativeFailure,
+}
+
+class SendQueueFailure {
+  const SendQueueFailure({
+    required this.code,
+    required this.message,
+    required this.isTransient,
+  });
+
+  factory SendQueueFailure.fromJson(Map<String, Object?> json) {
+    final codeName = json['code'];
+    final message = json['message'];
+    final isTransient = json['isTransient'];
+    final code = SendQueueFailureCode.values
+        .where((value) => value.name == codeName)
+        .firstOrNull;
+    if (code == null || message is! String || isTransient is! bool) {
+      throw const ContractError(
+        ContractErrorCode.malformedPayload,
+        'Malformed send queue failure metadata.',
+      );
+    }
+    return SendQueueFailure(
+      code: code,
+      message: message,
+      isTransient: isTransient,
+    );
+  }
+
+  final SendQueueFailureCode code;
+  final String message;
+  final bool isTransient;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'code': code.name,
+    'message': message,
+    'isTransient': isTransient,
+  };
+}
+
 class SendQueueRecord {
   const SendQueueRecord({
     required this.message,
     required this.status,
     required this.createdAt,
     required this.updatedAt,
+    required this.attemptCount,
     this.deviceId,
-    this.failureReason,
+    this.failure,
+    this.nextAttemptAt,
+    this.acknowledgementDeadline,
   });
 
   factory SendQueueRecord.pending({
@@ -19,28 +77,42 @@ class SendQueueRecord {
     GarminDeviceId? deviceId,
   }) {
     message.validate();
-
     return SendQueueRecord(
       message: message,
       status: SendQueueStatus.pending,
       createdAt: createdAt.toUtc(),
       updatedAt: createdAt.toUtc(),
+      attemptCount: 0,
       deviceId: deviceId,
     );
   }
 
   factory SendQueueRecord.fromJson(Map<String, Object?> json) {
+    final rawFailure = json['failure'];
+    final attemptCount = json['attemptCount'];
+    if (attemptCount is! int || attemptCount < 0) {
+      throw const ContractError(
+        ContractErrorCode.malformedPayload,
+        'attemptCount must be a non-negative integer.',
+      );
+    }
     return SendQueueRecord(
       message: MessageEnvelope.fromJson(_map(json['message'], 'message')),
       status: _status(json['status']),
       createdAt: _dateTime(json['createdAt'], 'createdAt'),
       updatedAt: _dateTime(json['updatedAt'], 'updatedAt'),
+      attemptCount: attemptCount,
       deviceId: json['deviceId'] is String
           ? GarminDeviceId(json['deviceId']! as String)
           : null,
-      failureReason: json['failureReason'] is String
-          ? json['failureReason']! as String
-          : null,
+      failure: rawFailure == null
+          ? null
+          : SendQueueFailure.fromJson(_map(rawFailure, 'failure')),
+      nextAttemptAt: _optionalDateTime(json['nextAttemptAt'], 'nextAttemptAt'),
+      acknowledgementDeadline: _optionalDateTime(
+        json['acknowledgementDeadline'],
+        'acknowledgementDeadline',
+      ),
     );
   }
 
@@ -49,20 +121,29 @@ class SendQueueRecord {
   final DateTime createdAt;
   final DateTime updatedAt;
   final GarminDeviceId? deviceId;
-  final String? failureReason;
+  final SendQueueFailure? failure;
+  final int attemptCount;
+  final DateTime? nextAttemptAt;
+  final DateTime? acknowledgementDeadline;
 
   String get id => message.id;
+  String? get failureReason => failure?.message;
 
-  Map<String, Object?> toJson() {
-    return <String, Object?>{
-      'message': message.toJson(),
-      'status': status.name,
-      'createdAt': createdAt.toUtc().toIso8601String(),
-      'updatedAt': updatedAt.toUtc().toIso8601String(),
-      if (deviceId != null) 'deviceId': deviceId!.value,
-      if (failureReason != null) 'failureReason': failureReason,
-    };
-  }
+  Map<String, Object?> toJson() => <String, Object?>{
+    'message': message.toJson(),
+    'status': status.name,
+    'createdAt': createdAt.toUtc().toIso8601String(),
+    'updatedAt': updatedAt.toUtc().toIso8601String(),
+    'attemptCount': attemptCount,
+    if (deviceId != null) 'deviceId': deviceId!.value,
+    if (failure != null) 'failure': failure!.toJson(),
+    if (nextAttemptAt != null)
+      'nextAttemptAt': nextAttemptAt!.toUtc().toIso8601String(),
+    if (acknowledgementDeadline != null)
+      'acknowledgementDeadline': acknowledgementDeadline!
+          .toUtc()
+          .toIso8601String(),
+  };
 
   SendQueueRecord copyWith({
     MessageEnvelope? message,
@@ -70,8 +151,13 @@ class SendQueueRecord {
     DateTime? createdAt,
     DateTime? updatedAt,
     GarminDeviceId? deviceId,
-    String? failureReason,
-    bool clearFailureReason = false,
+    SendQueueFailure? failure,
+    int? attemptCount,
+    DateTime? nextAttemptAt,
+    DateTime? acknowledgementDeadline,
+    bool clearFailure = false,
+    bool clearNextAttemptAt = false,
+    bool clearAcknowledgementDeadline = false,
   }) {
     return SendQueueRecord(
       message: message ?? this.message,
@@ -79,19 +165,30 @@ class SendQueueRecord {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deviceId: deviceId ?? this.deviceId,
-      failureReason: clearFailureReason
+      failure: clearFailure ? null : failure ?? this.failure,
+      attemptCount: attemptCount ?? this.attemptCount,
+      nextAttemptAt: clearNextAttemptAt
           ? null
-          : failureReason ?? this.failureReason,
+          : nextAttemptAt ?? this.nextAttemptAt,
+      acknowledgementDeadline: clearAcknowledgementDeadline
+          ? null
+          : acknowledgementDeadline ?? this.acknowledgementDeadline,
     );
   }
 
-  SendQueueRecord applyTransportSuccess(DateTime now) {
+  SendQueueRecord applyTransportSuccess(
+    DateTime now, {
+    DateTime? acknowledgementDeadline,
+  }) {
     return copyWith(
       status: message.kind.requiresAcknowledgement
           ? SendQueueStatus.sending
           : SendQueueStatus.sent,
       updatedAt: now.toUtc(),
-      clearFailureReason: true,
+      acknowledgementDeadline: acknowledgementDeadline,
+      clearFailure: true,
+      clearNextAttemptAt: true,
+      clearAcknowledgementDeadline: !message.kind.requiresAcknowledgement,
     );
   }
 
@@ -106,8 +203,8 @@ class SendQueueRecord {
         '${acknowledgement.ackFor}, not ${message.id}.',
       );
     }
-
-    if (!message.kind.requiresAcknowledgement) {
+    if (!message.kind.requiresAcknowledgement ||
+        status != SendQueueStatus.sending) {
       return this;
     }
 
@@ -115,18 +212,32 @@ class SendQueueRecord {
       WatchAcknowledgementOutcome.sent => copyWith(
         status: SendQueueStatus.sent,
         updatedAt: now.toUtc(),
-        clearFailureReason: true,
+        clearFailure: true,
+        clearNextAttemptAt: true,
+        clearAcknowledgementDeadline: true,
       ),
       WatchAcknowledgementOutcome.failed => copyWith(
         status: SendQueueStatus.failed,
         updatedAt: now.toUtc(),
-        failureReason:
-            acknowledgement.reason ?? acknowledgement.status.wireName,
+        failure: SendQueueFailure(
+          code: acknowledgement.status == WatchAcknowledgementStatus.unsupported
+              ? SendQueueFailureCode.unsupported
+              : SendQueueFailureCode.rejected,
+          message: acknowledgement.reason ?? acknowledgement.status.wireName,
+          isTransient: false,
+        ),
+        clearNextAttemptAt: true,
+        clearAcknowledgementDeadline: true,
       ),
       WatchAcknowledgementOutcome.retryable => copyWith(
         status: SendQueueStatus.pending,
         updatedAt: now.toUtc(),
-        failureReason: acknowledgement.reason,
+        failure: SendQueueFailure(
+          code: SendQueueFailureCode.nativeFailure,
+          message: acknowledgement.reason ?? 'The watch requested a retry.',
+          isTransient: true,
+        ),
+        clearAcknowledgementDeadline: true,
       ),
     };
   }
@@ -135,9 +246,7 @@ class SendQueueRecord {
 SendQueueStatus _status(Object? value) {
   if (value is String) {
     for (final status in SendQueueStatus.values) {
-      if (status.name == value) {
-        return status;
-      }
+      if (status.name == value) return status;
     }
   }
   throw ContractError(
@@ -149,9 +258,7 @@ SendQueueStatus _status(Object? value) {
 DateTime _dateTime(Object? value, String field) {
   if (value is String) {
     final parsed = DateTime.tryParse(value);
-    if (parsed != null) {
-      return parsed.toUtc();
-    }
+    if (parsed != null) return parsed.toUtc();
   }
   throw ContractError(
     ContractErrorCode.malformedPayload,
@@ -159,10 +266,13 @@ DateTime _dateTime(Object? value, String field) {
   );
 }
 
+DateTime? _optionalDateTime(Object? value, String field) {
+  if (value == null) return null;
+  return _dateTime(value, field);
+}
+
 Map<String, Object?> _map(Object? value, String field) {
-  if (value is Map) {
-    return value.cast<String, Object?>();
-  }
+  if (value is Map) return value.cast<String, Object?>();
   throw ContractError(
     ContractErrorCode.malformedPayload,
     '$field must be an object.',

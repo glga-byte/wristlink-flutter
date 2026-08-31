@@ -20,6 +20,10 @@ internal class DeviceSettingsBridge(private val context: Context) {
         }
     }
 
+    fun unregister(binaryMessenger: BinaryMessenger) {
+        MethodChannel(binaryMessenger, DEVICE_SETTINGS_CHANNEL).setMethodCallHandler(null)
+    }
+
     private fun settings() = context.getSharedPreferences(DEVICE_SETTINGS_NAME, Context.MODE_PRIVATE)
 
     private companion object {

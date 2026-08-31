@@ -1,0 +1,51 @@
+[
+  {
+    "name": "place path and camera coordinates",
+    "input": "https://www.google.com/maps/place/Brandenburg+Gate/@52.516275,13.377704,17z",
+    "lat": 52.516275,
+    "lon": 13.377704,
+    "label": "Brandenburg Gate"
+  },
+  {
+    "name": "maps query",
+    "input": "https://www.google.com/maps/search/?api=1&query=48.85837%2C2.294481",
+    "lat": 48.85837,
+    "lon": 2.294481,
+    "label": "Shared point"
+  },
+  {
+    "name": "destination query",
+    "input": "https://maps.google.com/maps/dir/?api=1&destination=40.689249%2C-74.0445",
+    "lat": 40.689249,
+    "lon": -74.0445,
+    "label": "Shared point"
+  },
+  {
+    "name": "selected place data coordinates",
+    "input": "https://www.google.com/maps/place/Mountain+View,+CA+94043/data=!4m6!3m5!1sredacted!7e2!8m2!3d37.4219238!4d-122.0832704!18m1!1e1",
+    "lat": 37.4219238,
+    "lon": -122.0832704,
+    "label": "Mountain View, CA 94043"
+  },
+  {
+    "name": "encoded unicode and percent place label",
+    "input": "https://www.google.com/maps/place/Example+Z%C3%BCrich+100%25/@12.345678,-45.678901,17z",
+    "lat": 12.345678,
+    "lon": -45.678901,
+    "label": "Example Zürich 100%"
+  },
+  {
+    "name": "geo uri label",
+    "input": "geo:0,0?q=37.7749,-122.4194(San%20Francisco)",
+    "lat": 0.0,
+    "lon": 0.0,
+    "label": "San Francisco"
+  },
+  {
+    "name": "plain coordinates",
+    "input": "Meet here: 51.500729, -0.124625",
+    "lat": 51.500729,
+    "lon": -0.124625,
+    "label": "Meet here"
+  }
+]

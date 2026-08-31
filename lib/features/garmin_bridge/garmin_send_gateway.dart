@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 
 import '../devices/domain/garmin_device.dart';
+import '../devices/domain/physical_device_id_codec.dart';
 import '../payloads/message_contract.dart';
 
 abstract interface class GarminSendGateway {
@@ -27,6 +28,8 @@ enum GarminSendErrorCode {
   deviceUnavailable,
   appNotInstalled,
   payloadTooLarge,
+  transportTimeout,
+  invalidDeviceId,
   unsupportedPlatform,
   nativeFailure,
 }
@@ -44,9 +47,12 @@ class GarminSendError implements Exception {
 class MethodChannelGarminSendGateway implements GarminSendGateway {
   MethodChannelGarminSendGateway({
     MethodChannel channel = const MethodChannel('wristlink/garmin_send'),
-  }) : _channel = channel;
+    PhysicalDeviceIdCodec deviceIdCodec = const PhysicalDeviceIdCodec(),
+  }) : _channel = channel,
+       _deviceIdCodec = deviceIdCodec;
 
   final MethodChannel _channel;
+  final PhysicalDeviceIdCodec _deviceIdCodec;
 
   @override
   Future<GarminSendResult> sendMessage({
@@ -54,10 +60,16 @@ class MethodChannelGarminSendGateway implements GarminSendGateway {
     required MessageEnvelope message,
   }) async {
     message.validate();
+    final String rawDeviceId;
+    try {
+      rawDeviceId = _deviceIdCodec.toRaw(deviceId);
+    } on PhysicalDeviceIdCodecException catch (error) {
+      throw GarminSendError(GarminSendErrorCode.invalidDeviceId, error.message);
+    }
 
     try {
       await _channel.invokeMethod<Object?>('sendMessage', <String, Object?>{
-        'deviceId': deviceId.value,
+        'deviceId': rawDeviceId,
         'message': message.toJson(),
       });
       return GarminSendResult(
@@ -97,6 +109,7 @@ Object mapGarminSendPlatformException(PlatformException error) {
     'sdkUnavailable' => GarminSendErrorCode.sdkUnavailable,
     'deviceUnavailable' => GarminSendErrorCode.deviceUnavailable,
     'appNotInstalled' => GarminSendErrorCode.appNotInstalled,
+    'transportTimeout' => GarminSendErrorCode.transportTimeout,
     'unsupportedPlatform' => GarminSendErrorCode.unsupportedPlatform,
     _ => GarminSendErrorCode.nativeFailure,
   };

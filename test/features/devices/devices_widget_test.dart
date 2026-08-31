@@ -143,6 +143,11 @@ class _ErrorGateway implements GarminDeviceDiscoveryGateway {
       'Garmin Connect missing',
     );
   }
+
+  @override
+  Future<List<GarminDevice>> hydrateTransport(
+    List<GarminDevice> authorizedDevices,
+  ) async => authorizedDevices;
 }
 
 class _App extends StatelessWidget {

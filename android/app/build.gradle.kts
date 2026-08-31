@@ -8,10 +8,14 @@ plugins {
 private val WRISTLINK_CONNECT_IQ_APP_UUID = "WRISTLINK_CONNECT_IQ_APP_UUID"
 private val WRISTLINK_DEV_CONNECT_IQ_APP_UUID = "WRISTLINK_DEV_CONNECT_IQ_APP_UUID"
 private val WRISTLINK_PROD_CONNECT_IQ_APP_UUID = "WRISTLINK_PROD_CONNECT_IQ_APP_UUID"
+private val WRISTLINK_GOOGLE_MAPS_API_KEY = "WRISTLINK_GOOGLE_MAPS_API_KEY"
+private val WRISTLINK_DEV_GOOGLE_MAPS_API_KEY = "WRISTLINK_DEV_GOOGLE_MAPS_API_KEY"
+private val WRISTLINK_PROD_GOOGLE_MAPS_API_KEY = "WRISTLINK_PROD_GOOGLE_MAPS_API_KEY"
 private val WRISTLINK_FLAVOR_CONFIG_PATH = "../config/wristlink-flavors.xcconfig"
+private val WRISTLINK_MAPS_LOCAL_CONFIG_PATH = "../config/wristlink-maps.local.xcconfig"
 
-private val wristLinkFlavorConfig: Map<String, String> =
-    rootProject.file(WRISTLINK_FLAVOR_CONFIG_PATH).readLines().mapNotNull { rawLine ->
+private fun parseWristLinkConfig(path: String): Map<String, String> =
+    rootProject.file(path).takeIf { it.exists() }?.readLines().orEmpty().mapNotNull { rawLine ->
         val line = rawLine.substringBefore("//").trim()
         if (line.isBlank() || line.startsWith("#")) {
             null
@@ -22,9 +26,26 @@ private val wristLinkFlavorConfig: Map<String, String> =
         }
     }.toMap()
 
+private val wristLinkFlavorConfig: Map<String, String> =
+    parseWristLinkConfig(WRISTLINK_FLAVOR_CONFIG_PATH) +
+        parseWristLinkConfig(WRISTLINK_MAPS_LOCAL_CONFIG_PATH)
+
 private fun wristLinkFlavorConfigValue(key: String): String =
     wristLinkFlavorConfig[key]
         ?: error("Missing $key in $WRISTLINK_FLAVOR_CONFIG_PATH")
+
+private fun wristLinkMapKey(key: String): String {
+    val value = System.getenv(key)?.takeIf { it.isNotBlank() }
+        ?: wristLinkFlavorConfigValue(key)
+    if (value == "MISSING_GOOGLE_MAPS_API_KEY" || value.startsWith("YOUR_")) {
+        logger.warn(
+            "WristLink Google Maps key is not configured for $key. " +
+                "Copy config/wristlink-maps.example.xcconfig to " +
+                "config/wristlink-maps.local.xcconfig and add a restricted key.",
+        )
+    }
+    return value
+}
 
 android {
     namespace = "com.wristlink.wristlink_flutter"
@@ -44,10 +65,11 @@ android {
         applicationId = "com.wristlink.wristlink_flutter"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     flavorDimensions += "environment"
@@ -57,11 +79,15 @@ android {
             applicationIdSuffix = ".dev"
             manifestPlaceholders[WRISTLINK_CONNECT_IQ_APP_UUID] =
                 wristLinkFlavorConfigValue(WRISTLINK_DEV_CONNECT_IQ_APP_UUID)
+            manifestPlaceholders[WRISTLINK_GOOGLE_MAPS_API_KEY] =
+                wristLinkMapKey(WRISTLINK_DEV_GOOGLE_MAPS_API_KEY)
         }
         create("prod") {
             dimension = "environment"
             manifestPlaceholders[WRISTLINK_CONNECT_IQ_APP_UUID] =
                 wristLinkFlavorConfigValue(WRISTLINK_PROD_CONNECT_IQ_APP_UUID)
+            manifestPlaceholders[WRISTLINK_GOOGLE_MAPS_API_KEY] =
+                wristLinkMapKey(WRISTLINK_PROD_GOOGLE_MAPS_API_KEY)
         }
     }
 
@@ -81,4 +107,7 @@ flutter {
 dependencies {
     implementation("com.garmin.connectiq:ciq-companion-app-sdk:2.4.0@aar")
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:core-ktx:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit-ktx:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }

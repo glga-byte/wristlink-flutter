@@ -1,0 +1,9 @@
+// Copy this file to wristlink-maps.local.xcconfig and replace both values.
+// Restrict Android keys to the matching package id and signing certificate:
+//   dev  com.wristlink.wristlink_flutter.dev
+//   prod com.wristlink.wristlink_flutter
+// Restrict iOS keys to the matching bundle id:
+//   dev  com.wristlink.wristlinkFlutter.dev
+//   prod com.wristlink.wristlinkFlutter
+WRISTLINK_DEV_GOOGLE_MAPS_API_KEY = YOUR_RESTRICTED_DEV_KEY
+WRISTLINK_PROD_GOOGLE_MAPS_API_KEY = YOUR_RESTRICTED_PROD_KEY

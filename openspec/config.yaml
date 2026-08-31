@@ -18,3 +18,19 @@ schema: spec-driven
 #       - Always include a "Non-goals" section
 #     tasks:
 #       - Break tasks into chunks of max 2 hours
+
+# Add custom guidance for specific operations.
+# operations:
+#   apply:
+#     guidance:
+#       - Run focused tests before the full suite
+#       - Keep edits minimal and focused on the requested change
+#   archive:
+#     guidance:
+#       - Keep the completion summary concise
+
+operations:
+  apply:
+    guidance:
+      - Work through tasks sequentially ONLY by delegating to subagents
+      # - Review each completed task using a separate review subagent before checking off the list
