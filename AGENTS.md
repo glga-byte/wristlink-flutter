@@ -36,7 +36,7 @@ test/                  # Unit/widget tests
 integration_test/      # Integration scenarios when needed
 ```
 
-## Best Practices
+## Agent Guidance
 
 - Keep business logic in Dart; use native Android/iOS code only for Garmin SDK adapters, platform callbacks, and platform background services.
 - Wrap Platform Channels in a typed Dart API; do not call channels directly from UI code.
@@ -84,6 +84,7 @@ integration_test/      # Integration scenarios when needed
   failures, including too-large app-message payloads, to typed Dart domain
   errors. Do not add payload business rules in native bridge code.
 - When a feature introduces durable project knowledge, architecture rules, platform constraints, verification steps, or conventions that future agents must follow, update `AGENTS.md` as part of the same change.
+- When implementation or verification changes the planned sequencing, test scope, or required follow-up work, update the active OpenSpec change's `tasks.md` in the same change so the next step is explicit; do not rely on handoff notes alone.
 - When Paper design files are updated, update the corresponding PNG snapshots
   in `docs/design/paper/` in the same change so design reviews stay in sync.
 
@@ -102,14 +103,32 @@ dart run tool/android_gradle.dart testDevDebugUnitTest testProdDebugUnitTest
 
 Run these checks before handing off changes:
 
-Before running connected Android tests, check `adb devices`. If no emulator or
-physical device is connected, ask the user to start one. Do not launch an
-emulator automatically.
+- When emulator or simulator verification is required, use Computer Use when
+  available to inspect and interact with the running Flutter app. Exercise the
+  touch, text-input, scrolling, navigation, system-back, and platform-specific
+  flows relevant to the change, and inspect the rendered result instead of
+  relying only on a successful build or launch.
+- Keep builds, deployment, automated tests, device discovery, and runtime-log
+  collection on the Flutter, `adb`, `xcrun`, and `xcodebuild` command-line path.
+  If Computer Use is unavailable or virtual-device access is denied, report the
+  visual or input check as not verified and provide the remaining manual steps;
+  do not claim emulator or simulator verification from compilation alone.
 
-Before running iOS tests, check `xcrun simctl list devices available`. If no
-simulator is available, ask the user to install or create one. Do not create or
-boot a simulator automatically. Run the `xcodebuild` command with `ios/` as its
-working directory.
+Before running connected Android tests or Android emulator verification, check
+`adb devices`. If no emulator or physical device is connected, list the
+configured Android emulators and launch a suitable existing emulator
+automatically, then wait for it to finish booting. Do not ask the user to start
+it and do not create a new Android Virtual Device. If no configured emulator can
+be launched, report the affected checks as not verified and provide the manual
+steps required to unblock them.
+
+Before running iOS tests or simulator verification, check
+`xcrun simctl list devices available`, select a suitable existing simulator,
+and boot it automatically when needed. Do not ask the user to boot it, and do
+not install a simulator runtime or create a new simulator. If no suitable
+simulator is available, report the affected checks as not verified and provide
+the manual steps required to unblock them. Run the `xcodebuild` command with
+`ios/` as its working directory.
 
 ```sh
 dart format .
